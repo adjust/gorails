@@ -1,8 +1,6 @@
 package marshal
 
-import (
-	"errors"
-)
+import "errors"
 
 type MarshalledObject struct {
 	MajorVersion byte
@@ -13,6 +11,7 @@ type MarshalledObject struct {
 type marshalledObjectType byte
 
 var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast the marshalled object")
+var IncompleteData = errors.New("gorails/marshal: incomplete data")
 
 const (
 	TYPE_UNKNOWN marshalledObjectType = 0
@@ -20,8 +19,9 @@ const (
 	TYPE_BOOLEAN marshalledObjectType = 2
 	TYPE_INTEGER marshalledObjectType = 3
 	TYPE_FLOAT   marshalledObjectType = 4
-	TYPE_ARRAY   marshalledObjectType = 5
-	TYPE_MAP     marshalledObjectType = 6
+	TYPE_STRING  marshalledObjectType = 5
+	TYPE_ARRAY   marshalledObjectType = 6
+	TYPE_MAP     marshalledObjectType = 7
 )
 
 func CreateMarshalledObject(serialized_data []byte) *MarshalledObject {
@@ -36,25 +36,33 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 	return
 }
 
-func (obj *MarshalledObject) GetType() (object_type marshalledObjectType) {
-	switch obj.data[0] {
-	case '0':
-		object_type = TYPE_NIL
-	case 'T', 'F':
-		object_type = TYPE_BOOLEAN
-	case 'i':
-		object_type = TYPE_INTEGER
-	case 'f':
-		object_type = TYPE_FLOAT
-	case '[':
-		object_type = TYPE_ARRAY
-	case '{':
-		object_type = TYPE_MAP
-	default:
-		object_type = TYPE_UNKNOWN
+func (obj *MarshalledObject) GetType() marshalledObjectType {
+	if len(obj.data) == 0 {
+		return TYPE_UNKNOWN
 	}
 
-	return
+	switch obj.data[0] {
+	case '0':
+		return TYPE_NIL
+	case 'T', 'F':
+		return TYPE_BOOLEAN
+	case 'i':
+		return TYPE_INTEGER
+	case 'f':
+		return TYPE_FLOAT
+	case ':':
+		return TYPE_STRING
+	case 'I':
+		if len(obj.data) > 1 && obj.data[1] == '"' {
+			return TYPE_STRING
+		}
+	case '[':
+		return TYPE_ARRAY
+	case '{':
+		return TYPE_MAP
+	}
+
+	return TYPE_UNKNOWN
 }
 
 func (obj *MarshalledObject) GetAsBoolean() (value bool, err error) {
@@ -96,6 +104,31 @@ func (obj *MarshalledObject) GetAsInteger() (value int, err error) {
 		}
 
 		value = -(value + 1)
+	}
+
+	return
+}
+
+func (obj *MarshalledObject) GetAsString() (value string, err error) {
+	err = assertType(obj, TYPE_STRING)
+	if err != nil {
+		return
+	}
+
+	var length, offset int
+
+	if obj.data[0] == ':' {
+		length, _ = CreateMarshalledObject([]byte{obj.MajorVersion, obj.MinorVersion, 'i', obj.data[1]}).GetAsInteger()
+		offset = 2
+	} else {
+		length, _ = CreateMarshalledObject([]byte{obj.MajorVersion, obj.MinorVersion, 'i', obj.data[2]}).GetAsInteger()
+		offset = 3
+	}
+
+	if len(obj.data) < length+offset {
+		err = IncompleteData
+	} else {
+		value = string(obj.data[offset : length+offset])
 	}
 
 	return

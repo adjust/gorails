@@ -22,7 +22,7 @@ type getTypeTestCase struct {
 }
 
 func TestGetType(t *testing.T) {
-	marshalledObjectTypeNames := []string{"unknown", "nil", "boolean", "integer", "float", "array", "map"}
+	marshalledObjectTypeNames := []string{"unknown", "nil", "boolean", "integer", "float", "string", "array", "map"}
 
 	tests := []getTypeTestCase{
 		// Nil
@@ -42,6 +42,10 @@ func TestGetType(t *testing.T) {
 		{[]byte{4, 8, 102, 9, 45, 49, 46, 53}, TYPE_FLOAT},                   // -1.5
 		{[]byte{4, 8, 102, 12, 49, 46, 50, 53, 101, 51, 48}, TYPE_FLOAT},     // 1.25e30
 		{[]byte{4, 8, 102, 13, 49, 46, 50, 53, 101, 45, 51, 48}, TYPE_FLOAT}, // 1.25e-30
+		// Strings
+		{[]byte{4, 8, 73, 34, 0, 6, 58, 6, 69, 84}, TYPE_STRING},                                                           // ''
+		{[]byte{4, 8, 58, 10, 104, 101, 108, 108, 111}, TYPE_STRING},                                                       // :hello
+		{[]byte{4, 8, 73, 34, 17, 72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 6, 58, 6, 69, 84}, TYPE_STRING}, // 'Hello, world'
 		// Arrays
 		{[]byte{4, 8, 91, 0}, TYPE_ARRAY},                                             // []
 		{[]byte{4, 8, 91, 6, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84}, TYPE_ARRAY}, // ["foo"]
@@ -120,6 +124,36 @@ func TestGetAsInteger(t *testing.T) {
 
 		if value != testCase.Expectation {
 			t.Errorf("GetAsInteger() returned '%d' instead of '%d'", value, testCase.Expectation)
+		}
+	}
+}
+
+type getAsStringTestCase struct {
+	Data        []byte
+	Expectation string
+}
+
+func TestGetAsString(t *testing.T) {
+	tests := []getAsStringTestCase{
+		{[]byte{4, 8, 73, 34, 0, 6, 58, 6, 69, 84}, ""},                                                                       // ''
+		{[]byte{4, 8, 58, 10, 104, 101, 108, 108, 111}, "hello"},                                                              // :hello
+		{[]byte{4, 8, 73, 34, 17, 72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 6, 58, 6, 69, 84}, "Hello, world"}, // 'Hello, world'
+	}
+
+	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsString() // should return an error
+	if err == nil {
+		t.Error("GetAsString() returned no error when attempted to typecast nil to boolean")
+	}
+
+	for _, testCase := range tests {
+		value, err = CreateMarshalledObject(testCase.Data).GetAsString()
+
+		if err != nil {
+			t.Errorf("GetAsString() returned an error: '%s' for %s", err.Error(), testCase.Expectation)
+		}
+
+		if value != testCase.Expectation {
+			t.Errorf("GetAsString() returned '%s' instead of '%s'", value, testCase.Expectation)
 		}
 	}
 }
