@@ -1,6 +1,8 @@
 package marshal
 
-import "errors"
+import (
+	"errors"
+)
 
 type MarshalledObject struct {
 	MajorVersion byte
@@ -74,37 +76,43 @@ func (obj *MarshalledObject) GetAsBoolean() (value bool, err error) {
 	return
 }
 
+func loadInteger(data []byte) int {
+	if data[0] > 0x05 && data[0] < 0xfb {
+		value := int(data[0])
+
+		if value > 0x7f {
+			return -(0xff ^ value + 1) + 5
+		} else {
+			return value - 5
+		}
+	} else if data[0] <= 0x05 {
+		value := 0
+		i := data[0]
+
+		for ; i > 0; i-- {
+			value = value<<8 + int(data[i])
+		}
+
+		return value
+	} else {
+		value := 0
+		i := 0xff - data[0] + 1
+
+		for ; i > 0; i-- {
+			value = value<<8 + (0xff - int(data[i]))
+		}
+
+		return -(value + 1)
+	}
+}
+
 func (obj *MarshalledObject) GetAsInteger() (value int, err error) {
 	err = assertType(obj, TYPE_INTEGER)
 	if err != nil {
 		return
 	}
 
-	if obj.data[1] > 0x05 && obj.data[1] < 0xfb {
-		value = int(obj.data[1])
-
-		if value > 0x7f {
-			value = -(0xff ^ value + 1) + 5
-		} else {
-			value -= 5
-		}
-	} else if obj.data[1] <= 0x05 {
-		value = 0
-		i := obj.data[1]
-
-		for ; i > 0; i-- {
-			value = value<<8 + int(obj.data[i+1])
-		}
-	} else {
-		value = 0
-		i := 0xff - obj.data[1] + 1
-
-		for ; i > 0; i-- {
-			value = value<<8 + (0xff - int(obj.data[i+1]))
-		}
-
-		value = -(value + 1)
-	}
+	value = loadInteger(obj.data[1:])
 
 	return
 }
@@ -115,16 +123,15 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 		return
 	}
 
-	var length, offset int
+	var offset int
 
 	if obj.data[0] == ':' {
-		length, _ = CreateMarshalledObject([]byte{obj.MajorVersion, obj.MinorVersion, 'i', obj.data[1]}).GetAsInteger()
 		offset = 2
 	} else {
-		length, _ = CreateMarshalledObject([]byte{obj.MajorVersion, obj.MinorVersion, 'i', obj.data[2]}).GetAsInteger()
 		offset = 3
 	}
 
+	length := loadInteger(obj.data[offset-1 : offset+4])
 	if len(obj.data) < length+offset {
 		err = IncompleteData
 	} else {
