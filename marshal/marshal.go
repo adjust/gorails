@@ -2,6 +2,7 @@ package marshal
 
 import (
   "errors"
+  "log"
 )
 
 type MarshalledObject struct {
@@ -11,25 +12,31 @@ type MarshalledObject struct {
 }
 
 type marshalledObjectType byte
-var UnknownObjectType = errors.New("gorails/marshal: unknown marshalled object type")
+var TypeMismatch      = errors.New("gorails/marshal: an attempt to implicitly typecast the marshalled object")
 
 const (
   TYPE_UNKNOWN marshalledObjectType = 0
-  TYPE_MAP     marshalledObjectType = 1
-  TYPE_ARRAY   marshalledObjectType = 2
-  TYPE_BOOLEAN marshalledObjectType = 3
-  TYPE_INTEGER marshalledObjectType = 4
-  TYPE_FLOAT   marshalledObjectType = 5
-  TYPE_NIL     marshalledObjectType = 6
+  TYPE_NIL     marshalledObjectType = 1
+  TYPE_BOOLEAN marshalledObjectType = 2
+  TYPE_INTEGER marshalledObjectType = 3
+  TYPE_FLOAT   marshalledObjectType = 4
+  TYPE_ARRAY   marshalledObjectType = 5
+  TYPE_MAP     marshalledObjectType = 6
 )
 
 func CreateMarshalledObject(serialized_data []byte) (*MarshalledObject) {
   return &(MarshalledObject{serialized_data[0], serialized_data[1], serialized_data[2:]})
 }
 
-func (obj *MarshalledObject) GetType() (object_type marshalledObjectType, err error) {
-  object_type = TYPE_UNKNOWN
+func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err error) {
+  if obj.GetType() != expected_type {
+    err = TypeMismatch
+  }
 
+  return
+}
+
+func (obj *MarshalledObject) GetType() (object_type marshalledObjectType) {
   switch (obj.data[0]) {
   case '0':
     object_type = TYPE_NIL
@@ -44,7 +51,43 @@ func (obj *MarshalledObject) GetType() (object_type marshalledObjectType, err er
   case '{':
     object_type = TYPE_MAP
   default:
-    err = UnknownObjectType
+    object_type = TYPE_UNKNOWN
+  }
+
+  return
+}
+
+func (obj *MarshalledObject) GetAsBoolean() (value bool, err error) {
+  err = assertType(obj, TYPE_BOOLEAN)
+  if err == nil {
+    value = obj.data[0] == 'T'
+  }
+
+  return
+}
+
+func (obj *MarshalledObject) GetAsInteger() (value int, err error) {
+  err = assertType(obj, TYPE_INTEGER)
+  if err != nil {
+    return
+  }
+
+  if obj.data[1] > 0x05 && obj.data[1] < 0xfb {
+    value = int(obj.data[1])
+
+    if value > 0x7f {
+      value = -(0xff ^ value + 1) + 5
+    } else {
+      value -= 5
+    }
+  } else {
+    value = 0
+    i := obj.data[1] & 0xf0
+
+    log.Printf("Bytes num: %d", i)
+    for ; i > 0; i-- {
+      value = value << 8 + int(obj.data[i + 1] ^ 0xff)
+    }
   }
 
   return
