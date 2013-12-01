@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"testing"
+	"reflect"
 )
 
 func TestCreateMarshalledObject(t *testing.T) {
@@ -93,7 +94,7 @@ func TestGetAsBool(t *testing.T) {
 
 type getAsIntegerTestCase struct {
 	Data        []byte
-	Expectation int
+	Expectation int64
 }
 
 func TestGetAsInteger(t *testing.T) {
@@ -112,7 +113,7 @@ func TestGetAsInteger(t *testing.T) {
 
 	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsInteger() // should return an error
 	if err == nil {
-		t.Error("GetAsInteger() returned no error when attempted to typecast nil to boolean")
+		t.Error("GetAsInteger() returned no error when attempted to typecast nil to int")
 	}
 
 	for _, testCase := range tests {
@@ -152,7 +153,7 @@ func TestGetAsFloat(t *testing.T) {
 
 	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsFloat() // should return an error
 	if err == nil {
-		t.Error("GetAsFloat() returned no error when attempted to typecast nil to boolean")
+		t.Error("GetAsFloat() returned no error when attempted to typecast nil to float")
 	}
 
 	for _, testCase := range tests {
@@ -182,7 +183,7 @@ func TestGetAsString(t *testing.T) {
 
 	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsString() // should return an error
 	if err == nil {
-		t.Error("GetAsString() returned no error when attempted to typecast nil to boolean")
+		t.Error("GetAsString() returned no error when attempted to typecast nil to string")
 	}
 
 	for _, testCase := range tests {
@@ -194,6 +195,168 @@ func TestGetAsString(t *testing.T) {
 
 		if value != testCase.Expectation {
 			t.Errorf("GetAsString() returned '%v' instead of '%v'", value, testCase.Expectation)
+		}
+	}
+}
+
+type getAsArrayOfIntsTestCase struct {
+	Data        []byte
+	Expectation []int64
+}
+
+type getAsArrayOfStringsTestCase struct {
+	Data        []byte
+	Expectation []string
+}
+
+func TestGetAsArray(t *testing.T) {
+	int_tests := []getAsArrayOfIntsTestCase{
+		{[]byte{4, 8, 91, 0}, []int64{}},
+		{[]byte{4, 8, 91, 10, 105, 255, 0, 105, 250, 105, 0, 105, 6, 105, 2, 0, 1}, []int64{-256, -1, 0, 1, 256}},
+	}
+
+	_, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsArray() // should return an error
+	if err == nil {
+		t.Error("GetAsArray() returned no error when attempted to typecast nil to array")
+	}
+
+	for _, testCase := range int_tests {
+		value, err := CreateMarshalledObject(testCase.Data).GetAsArray()
+
+		if err != nil {
+			t.Errorf("GetAsArray() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
+		}
+
+		if len(value) != len(testCase.Expectation) {
+			t.Error("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
+		} else {
+			for i, v := range value {
+				value, err := v.GetAsInteger()
+
+				if err != nil {
+					t.Error("GetAsArray() returned an error '%v' for element #%d (%d) of %v", err.Error(), i, testCase.Expectation[i], testCase.Expectation)
+				}
+
+				if value != testCase.Expectation[i] {
+					t.Errorf("GetAsArray() returned '%v' instead of '%v'", value, testCase.Expectation)
+				}
+			}
+		}
+	}
+
+	string_tests := []getAsArrayOfStringsTestCase{
+		{[]byte{4, 8, 91, 6, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84}, []string{"foo"}}, // ["foo"]
+		{[]byte{4, 8, 91, 6, 58, 8, 98, 97, 114}, []string{"bar"}}, // [:bar]
+		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 59, 0, 84, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar", :baz]
+		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 58, 13, 101, 110, 99, 111, 100, 105, 110, 103, 34, 14, 83, 104, 105, 102, 116, 95, 74, 73, 83, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar".force_encoding("SHIFT_JIS"), :baz]
+	}
+
+	for _, testCase := range string_tests {
+		value, err := CreateMarshalledObject(testCase.Data).GetAsArray()
+
+		if err != nil {
+			t.Errorf("GetAsArray() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
+		}
+
+		if len(value) != len(testCase.Expectation) {
+			t.Errorf("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
+		} else {
+			for i, v := range value {
+				value, err := v.GetAsString()
+
+				if err != nil {
+					t.Errorf("GetAsArray() returned an error '%v' for element #%d (%v %d) of %v", err.Error(), i, testCase.Expectation[i], v.GetType(), testCase.Expectation)
+				}
+
+				if value != testCase.Expectation[i] {
+					t.Errorf("GetAsArray() returned '%v' instead of '%v'", value, testCase.Expectation)
+				}
+			}
+		}
+	}
+}
+
+type getAsMapOfIntsTestCase struct {
+	Data        []byte
+	Expectation map[string]int64
+}
+
+type getAsMapOfStringsTestCase struct {
+	Data        []byte
+	Expectation map[string]string
+}
+
+func TestGetAsMap(t *testing.T) {
+	int_tests := []getAsMapOfIntsTestCase{
+		{
+			[]byte{4, 8, 123, 0},
+			map[string]int64{},
+		},
+		{
+			[]byte{4, 8, 123, 12, 73, 34, 6, 48, 6, 58, 6, 69, 84, 105, 0, 105, 6, 105, 6, 105, 250, 105, 250, 48, 105, 255, 0, 73, 34, 8, 102, 111, 111, 6, 59, 0, 84, 105, 2, 0, 1, 73, 34, 8, 98, 97, 114, 6, 58, 13, 101, 110, 99, 111, 100, 105, 110, 103, 34, 14, 83, 104, 105, 102, 116, 95, 74, 73, 83, 105, 2, 188, 2, 58, 8, 98, 97, 122, 105, 254, 68, 253},
+			map[string]int64{
+				"0":     0,
+				"1":     1,
+				"-1":    -1,
+				"<nil>": -256,
+				"foo":   256,
+				"bar":   700,
+				"baz":   -700,
+			},
+		},
+	}
+
+	_, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsMap() // should return an error
+	if err == nil {
+		t.Error("GetAsMap() returned no error when attempted to typecast nil to map")
+	}
+
+	for _, testCase := range int_tests {
+		value, err := CreateMarshalledObject(testCase.Data).GetAsMap()
+
+		m := make(map[string]int64)
+		for k, v := range value {
+			m[k], err = v.GetAsInteger()
+
+			if err != nil {
+				t.Errorf("GetAsMap() returned an error while parsing %s", k)
+			}
+		}
+
+		if ! reflect.DeepEqual(m, testCase.Expectation) {
+			t.Errorf("%v is not equal %v", m, testCase.Expectation)
+		}
+	}
+
+	string_tests := []getAsMapOfStringsTestCase{
+		{
+			[]byte{4, 8, 123, 12, 73, 34, 6, 48, 6, 58, 6, 69, 84, 73, 34, 6, 48, 6, 59, 0, 84, 105, 6, 73, 34, 6, 49, 6, 59, 0, 84, 105, 250, 73, 34, 0, 6, 59, 0, 84, 48, 73, 34, 8, 102, 111, 111, 6, 59, 0, 84, 73, 34, 8, 102, 111, 111, 6, 59, 0, 84, 73, 34, 8, 98, 97, 114, 6, 58, 13, 101, 110, 99, 111, 100, 105, 110, 103, 34, 14, 83, 104, 105, 102, 116, 95, 74, 73, 83, 73, 34, 8, 98, 97, 114, 6, 59, 0, 84, 58, 8, 98, 97, 122, 59, 7, 73, 34, 6, 48, 6, 59, 0, 84},
+			map[string]string{
+				"0":     "0",   // "0" => "0"
+				"1":     "1",   // 1 => "1"
+				"-1":    "",    // -1 => ""
+				"<nil>": "foo", // nil => "foo"
+				"foo":   "bar", // "foo" => "bar".force_encoding("SHIFT_JIS")
+				"bar":   "baz", // "bar".force_encoding("SHIFT_JIS") => :baz
+				"baz":   "0",   // :baz => "0"
+			},
+		},
+	}
+
+	for _, testCase := range string_tests {
+		value, err := CreateMarshalledObject(testCase.Data).GetAsMap()
+
+		m := make(map[string]string)
+		for k, v := range value {
+			m[k], err = v.GetAsString()
+
+			if err != nil {
+				t.Errorf("GetAsMap() returned an error while parsing %s %d: %s", k, v.GetType(), err.Error())
+			}
+		}
+
+		if ! reflect.DeepEqual(m, testCase.Expectation) {
+			t.Errorf("%v is not equal %v", m, testCase.Expectation)
 		}
 	}
 }

@@ -9,11 +9,12 @@ type MarshalledObject struct {
 	MajorVersion byte
 	MinorVersion byte
 	data         []byte
+  symbolCache  *[]string
 }
 
 type marshalledObjectType byte
 
-var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast the marshalled object")
+var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast a marshalled object")
 var IncompleteData = errors.New("gorails/marshal: incomplete data")
 
 const (
@@ -27,8 +28,13 @@ const (
 	TYPE_MAP     marshalledObjectType = 7
 )
 
+func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string) *MarshalledObject {
+	return &(MarshalledObject{major_version, minor_version, data, symbolCache})
+}
+
 func CreateMarshalledObject(serialized_data []byte) *MarshalledObject {
-	return &(MarshalledObject{serialized_data[0], serialized_data[1], serialized_data[2:]})
+	cache := []string{}
+	return newMarshalledObject(serialized_data[0], serialized_data[1], serialized_data[2:], &cache)
 }
 
 func (obj *MarshalledObject) GetType() marshalledObjectType {
@@ -45,7 +51,7 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 		return TYPE_INTEGER
 	case 'f':
 		return TYPE_FLOAT
-	case ':':
+	case ':', ';':
 		return TYPE_STRING
 	case 'I':
 		if len(obj.data) > 1 && obj.data[1] == '"' {
@@ -71,7 +77,7 @@ func (obj *MarshalledObject) GetAsBool() (value bool, err error) {
 	return
 }
 
-func (obj *MarshalledObject) GetAsInteger() (value int, err error) {
+func (obj *MarshalledObject) GetAsInteger() (value int64, err error) {
 	err = assertType(obj, TYPE_INTEGER)
 	if err != nil {
 		return
@@ -100,10 +106,90 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 		return
 	}
 
-	if obj.data[0] == ':' {
+	var cache []string
+  if obj.data[0] == ':' {
 		value, _ = parseString(obj.data[1:])
+		obj.cacheSymbols(value)
+  } else if obj.data[0] == ';' {
+  	ref_index, _ := parseInt(obj.data[1:])
+    cache := *(obj.symbolCache)
+    value = cache[ref_index]
 	} else {
-		value, _ = parseString(obj.data[2:])
+		value, _, cache = parseStringWithEncoding(obj.data[2:])
+		obj.cacheSymbols(cache...)
+	}
+
+	return
+}
+
+func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error) {
+	err = assertType(obj, TYPE_ARRAY)
+	if err != nil {
+		return
+	}
+
+	array_size, offset := parseInt(obj.data[1:])
+  offset += 1
+
+	value = make([]*MarshalledObject, array_size)
+	for i := int64(0); i < array_size; i++ {
+		value_size := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[offset:],
+      obj.symbolCache,
+		).getSize()
+
+		value[i] = newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[offset:offset+value_size],
+      obj.symbolCache,
+		)
+		offset += value_size
+	}
+
+	return
+}
+
+func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err error) {
+	err = assertType(obj, TYPE_MAP)
+	if err != nil {
+		return
+	}
+
+	map_size, offset := parseInt(obj.data[1:])
+	offset += 1
+
+
+	value = make(map[string]*MarshalledObject, map_size)
+	for i := int64(0); i < map_size; i++ {
+
+		k := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[offset:],
+      obj.symbolCache,
+		)
+		offset += k.getSize()
+
+		value_size := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[offset:],
+      obj.symbolCache,
+		).getSize()
+
+		v := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[offset:offset+value_size],
+      obj.symbolCache,
+		)
+		value[k.toString()] = v
+
+
+		offset += value_size
 	}
 
 	return
@@ -117,13 +203,95 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 	return
 }
 
+func (obj *MarshalledObject) getSize() int {
+	header_size, data_size := 0, 0
+
+	switch obj.GetType() {
+	case TYPE_NIL, TYPE_BOOL:
+		header_size = 0
+		data_size   = 1
+	case TYPE_INTEGER:
+		header_size = 1
+		_, data_size = parseInt(obj.data[header_size:])
+	case TYPE_STRING, TYPE_FLOAT:
+		header_size = 1
+
+		if obj.data[0] == ';' {
+			_, data_size = parseInt(obj.data[header_size:])
+		} else {
+			var cache []string
+
+			if obj.data[0] == 'I' {
+				header_size += 1
+				_, data_size, cache = parseStringWithEncoding(obj.data[header_size:])
+				obj.cacheSymbols(cache...)
+			} else {
+				var symbol string
+				symbol, data_size = parseString(obj.data[header_size:])
+				obj.cacheSymbols(symbol)
+			}
+		}
+	}
+
+	return header_size + data_size
+}
+
+func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
+	if len(symbols) == 0 {
+		return
+	}
+
+	cache := *(obj.symbolCache)
+
+	known := make(map[string]struct{})
+	for _, symbol := range cache {
+		known[symbol] = struct{}{}
+	}
+
+	for _, symbol := range symbols {
+		_, exists := known[symbol]
+
+		if ! exists {
+			cache = append(cache, symbol)
+		}
+	}
+
+	*(obj.symbolCache) = cache
+
+}
+
+func (obj *MarshalledObject) toString() (str string) {
+	switch obj.GetType() {
+	case TYPE_NIL:
+		str = "<nil>"
+	case TYPE_BOOL:
+		v, _ := obj.GetAsBool()
+
+		if v {
+			str = "true"
+		} else {
+			str = "false"
+		}
+	case TYPE_INTEGER:
+		v, _ := obj.GetAsInteger()
+		str = strconv.FormatInt(v, 10)
+	case TYPE_STRING:
+		str, _ = obj.GetAsString()
+	case TYPE_FLOAT:
+		v, _ := obj.GetAsFloat()
+		str = strconv.FormatFloat(v, 'f', -1, 64)
+	}
+
+	return
+}
+
 func parseBool(data []byte) (bool, int) {
 	return data[0] == 'T', 1
 }
 
-func parseInt(data []byte) (int, int) {
+func parseInt(data []byte) (int64, int) {
 	if data[0] > 0x05 && data[0] < 0xfb {
-		value := int(data[0])
+		value := int64(data[0])
 
 		if value > 0x7f {
 			return -(0xff ^ value + 1) + 5, 1
@@ -131,43 +299,60 @@ func parseInt(data []byte) (int, int) {
 			return value - 5, 1
 		}
 	} else if data[0] <= 0x05 {
-		value := 0
+		value := int64(0)
 		i := data[0]
 
 		for ; i > 0; i-- {
-			value = value<<8 + int(data[i])
+			value = value<<8 + int64(data[i])
 		}
 
-		return value, int(data[0])
+		return value, int(data[0] + 1)
 	} else {
-		value := 0
+		value := int64(0)
 		i := 0xff - data[0] + 1
 
 		for ; i > 0; i-- {
-			value = value<<8 + (0xff - int(data[i]))
+			value = value<<8 + (0xff - int64(data[i]))
 		}
 
-		return -(value + 1), int(0xff - data[0] + 1)
+		return -(value + 1), int(0xff - data[0] + 2)
 	}
 }
 
 func parseString(data []byte) (string, int) {
-	length, size := parseInt(data)
-	value := string(data[size : length+size])
+	length, header_size := parseInt(data)
+	size := int(length) + header_size
 
-	if len(data) > length+size+1 && data[length+size+1] == ':' {
-		enc_symbol, enc_size := parseString(data[length+size+2:])
+  return string(data[header_size : size]), size
+}
 
-		if enc_symbol == "E" {
-			_, enc_name_size := parseBool(data[length+size+enc_size+1:])
-			enc_size += enc_name_size
+func parseStringWithEncoding(data []byte) (string, int, []string) {
+	cache := make([]string, 0)
+  value, size := parseString(data)
+
+  // May fail if string is followed by a symbol
+	if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
+    if data[size+1] == ';' {
+      _, enc_size := parseInt(data[size+2:])
+      size += enc_size + 1 // reference to a symbol
+    } else {
+      enc_symbol, enc_size := parseString(data[size+2:])
+      size += enc_size + 1
+      cache = append(cache, enc_symbol)
+    }
+
+    if data[size+1] == '"' {
+      encoding, enc_name_size := parseString(data[size+2:])
+      _ = encoding
+      size += enc_name_size + 1
 		} else {
-			_, enc_name_size := parseString(data[length+size+enc_size+3:])
-			enc_size += enc_name_size
+			_, enc_name_size := parseBool(data[size+1:])
+			size += enc_name_size
 		}
 
-		size += enc_size
+		size += 1
 	}
 
-	return value, length + size
+
+	return value, size, cache
 }
