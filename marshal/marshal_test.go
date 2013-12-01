@@ -22,14 +22,14 @@ type getTypeTestCase struct {
 }
 
 func TestGetType(t *testing.T) {
-	marshalledObjectTypeNames := []string{"unknown", "nil", "boolean", "integer", "float", "string", "array", "map"}
+	marshalledObjectTypeNames := []string{"unknown", "nil", "bool", "integer", "float", "string", "array", "map"}
 
 	tests := []getTypeTestCase{
 		// Nil
 		{[]byte{4, 8, 48}, TYPE_NIL},
 		// Booleans
-		{[]byte{4, 8, 70}, TYPE_BOOLEAN}, // false
-		{[]byte{4, 8, 84}, TYPE_BOOLEAN}, // true
+		{[]byte{4, 8, 70}, TYPE_BOOL}, // false
+		{[]byte{4, 8, 84}, TYPE_BOOL}, // true
 		// Integers
 		{[]byte{4, 8, 105, 0}, TYPE_INTEGER},                 // 0
 		{[]byte{4, 8, 105, 6}, TYPE_INTEGER},                 // 1
@@ -62,31 +62,31 @@ func TestGetType(t *testing.T) {
 	}
 }
 
-type getAsBooleanTestCase struct {
+type getAsBoolTestCase struct {
 	Data        []byte
 	Expectation bool
 }
 
-func TestGetAsBoolean(t *testing.T) {
-	tests := []getAsBooleanTestCase{
+func TestGetAsBool(t *testing.T) {
+	tests := []getAsBoolTestCase{
 		{[]byte{4, 8, 70}, false},
 		{[]byte{4, 8, 84}, true},
 	}
 
-	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsBoolean() // should return an error
+	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsBool() // should return an error
 	if err == nil {
-		t.Error("GetAsBoolean() returned no error when attempted to typecast nil to boolean")
+		t.Error("GetAsBool() returned no error when attempted to typecast nil to boolean")
 	}
 
 	for _, testCase := range tests {
-		value, err = CreateMarshalledObject(testCase.Data).GetAsBoolean()
+		value, err = CreateMarshalledObject(testCase.Data).GetAsBool()
 
 		if err != nil {
-			t.Errorf("GetAsBoolean() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
+			t.Errorf("GetAsBool() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
 		}
 
 		if value != testCase.Expectation {
-			t.Errorf("GetAsBoolean() returned '%v' instead of '%v'", value, testCase.Expectation)
+			t.Errorf("GetAsBool() returned '%v' instead of '%v'", value, testCase.Expectation)
 		}
 	}
 }
