@@ -8,11 +8,11 @@ func TestCreateMarshalledObject(t *testing.T) {
 	m := CreateMarshalledObject([]byte{4, 8, 1})
 
 	if m.MajorVersion != 4 {
-		t.Errorf("CreateMarshalledObject created an object with Marshal major version set to %d instead of 4", m.MajorVersion)
+		t.Errorf("CreateMarshalledObject created an object with Marshal major version set to %v instead of 4", m.MajorVersion)
 	}
 
 	if m.MinorVersion != 8 {
-		t.Errorf("CreateMarshalledObject created an object with Marshal minor version set to %d instead of 8", m.MinorVersion)
+		t.Errorf("CreateMarshalledObject created an object with Marshal minor version set to %v instead of 8", m.MinorVersion)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestGetType(t *testing.T) {
 	for _, testCase := range tests {
 		object_type := CreateMarshalledObject(testCase.Data).GetType()
 		if object_type != testCase.Expectation {
-			t.Errorf("GetType() returned '%s' instead of '%s'", marshalledObjectTypeNames[int(object_type)], marshalledObjectTypeNames[testCase.Expectation])
+			t.Errorf("GetType() returned '%v' instead of '%v'", marshalledObjectTypeNames[int(object_type)], marshalledObjectTypeNames[testCase.Expectation])
 		}
 	}
 }
@@ -82,11 +82,11 @@ func TestGetAsBoolean(t *testing.T) {
 		value, err = CreateMarshalledObject(testCase.Data).GetAsBoolean()
 
 		if err != nil {
-			t.Errorf("GetAsBoolean() returned an error: '%s' for %t", err.Error(), testCase.Expectation)
+			t.Errorf("GetAsBoolean() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
 		}
 
 		if value != testCase.Expectation {
-			t.Errorf("GetAsBoolean() returned '%t' instead of '%t'", value, testCase.Expectation)
+			t.Errorf("GetAsBoolean() returned '%v' instead of '%v'", value, testCase.Expectation)
 		}
 	}
 }
@@ -119,11 +119,51 @@ func TestGetAsInteger(t *testing.T) {
 		value, err = CreateMarshalledObject(testCase.Data).GetAsInteger()
 
 		if err != nil {
-			t.Errorf("GetAsInteger() returned an error: '%s' for %d", err.Error(), testCase.Expectation)
+			t.Errorf("GetAsInteger() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
 		}
 
 		if value != testCase.Expectation {
-			t.Errorf("GetAsInteger() returned '%d' instead of '%d'", value, testCase.Expectation)
+			t.Errorf("GetAsInteger() returned '%v' instead of '%v'", value, testCase.Expectation)
+		}
+	}
+}
+
+type getAsFloatTestCase struct {
+	Data        []byte
+	Expectation float64
+}
+
+func TestGetAsFloat(t *testing.T) {
+	tests := []getAsFloatTestCase{
+		{[]byte{4, 8, 102, 6, 48}, 0.0},
+		{[]byte{4, 8, 102, 13, 49, 46, 52, 51, 101, 45, 49, 48}, 1.43e-10},
+		{[]byte{4, 8, 102, 13, 49, 46, 52, 51, 101, 45, 49, 48}, 1.43E-10},
+		{[]byte{4, 8, 102, 10, 48, 46, 49, 50, 53}, 0.125},
+		{[]byte{4, 8, 102, 10, 49, 50, 46, 53, 54}, 12.56},
+		{[]byte{4, 8, 102, 12, 49, 46, 52, 51, 101, 49, 48}, 1.43e+10},
+		{[]byte{4, 8, 102, 12, 49, 46, 52, 51, 101, 49, 48}, 1.43E+10},
+		{[]byte{4, 8, 102, 14, 45, 49, 46, 52, 51, 101, 45, 49, 48}, -1.43e-10},
+		{[]byte{4, 8, 102, 14, 45, 49, 46, 52, 51, 101, 45, 49, 48}, -1.43E-10},
+		{[]byte{4, 8, 102, 11, 45, 48, 46, 49, 50, 53}, -0.125},
+		{[]byte{4, 8, 102, 11, 45, 49, 50, 46, 53, 54}, -12.56},
+		{[]byte{4, 8, 102, 13, 45, 49, 46, 52, 51, 101, 49, 48}, -1.43e+10},
+		{[]byte{4, 8, 102, 13, 45, 49, 46, 52, 51, 101, 49, 48}, -1.43E+10},
+	}
+
+	value, err := CreateMarshalledObject([]byte{4, 8, 48}).GetAsFloat() // should return an error
+	if err == nil {
+		t.Error("GetAsFloat() returned no error when attempted to typecast nil to boolean")
+	}
+
+	for _, testCase := range tests {
+		value, err = CreateMarshalledObject(testCase.Data).GetAsFloat()
+
+		if err != nil {
+			t.Errorf("GetAsFloat() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
+		}
+
+		if value != testCase.Expectation {
+			t.Errorf("GetAsFloat() returned '%v' instead of '%v'", value, testCase.Expectation)
 		}
 	}
 }
@@ -149,11 +189,11 @@ func TestGetAsString(t *testing.T) {
 		value, err = CreateMarshalledObject(testCase.Data).GetAsString()
 
 		if err != nil {
-			t.Errorf("GetAsString() returned an error: '%s' for %s", err.Error(), testCase.Expectation)
+			t.Errorf("GetAsString() returned an error: '%v' for %v", err.Error(), testCase.Expectation)
 		}
 
 		if value != testCase.Expectation {
-			t.Errorf("GetAsString() returned '%s' instead of '%s'", value, testCase.Expectation)
+			t.Errorf("GetAsString() returned '%v' instead of '%v'", value, testCase.Expectation)
 		}
 	}
 }

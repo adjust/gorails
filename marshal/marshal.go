@@ -2,6 +2,8 @@ package marshal
 
 import (
 	"errors"
+	// "log"
+	"strconv"
 )
 
 type MarshalledObject struct {
@@ -76,7 +78,7 @@ func (obj *MarshalledObject) GetAsBoolean() (value bool, err error) {
 	return
 }
 
-func loadInteger(data []byte) int {
+func parseInt(data []byte) int {
 	if data[0] > 0x05 && data[0] < 0xfb {
 		value := int(data[0])
 
@@ -112,9 +114,30 @@ func (obj *MarshalledObject) GetAsInteger() (value int, err error) {
 		return
 	}
 
-	value = loadInteger(obj.data[1:])
+	value = parseInt(obj.data[1:])
 
 	return
+}
+
+func (obj *MarshalledObject) GetAsFloat() (value float64, err error) {
+	err = assertType(obj, TYPE_FLOAT)
+	if err != nil {
+		return
+	}
+
+	value, err = strconv.ParseFloat(parseString(obj.data[1:]), 64)
+
+	return
+}
+
+func parseString(data []byte) string {
+	if data[0] > 0x05 {
+		length := parseInt(data[0:1])
+		return string(data[1 : length+1])
+	} else {
+		length := parseInt(data[0 : data[0]+1])
+		return string(data[data[0]+1 : length+int(data[0])+1])
+	}
 }
 
 func (obj *MarshalledObject) GetAsString() (value string, err error) {
@@ -123,19 +146,10 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 		return
 	}
 
-	var offset int
-
 	if obj.data[0] == ':' {
-		offset = 2
+		value = parseString(obj.data[1:])
 	} else {
-		offset = 3
-	}
-
-	length := loadInteger(obj.data[offset-1 : offset+4])
-	if len(obj.data) < length+offset {
-		err = IncompleteData
-	} else {
-		value = string(obj.data[offset : length+offset])
+		value = parseString(obj.data[2:])
 	}
 
 	return
