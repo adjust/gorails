@@ -350,11 +350,10 @@ func parseStringWithEncoding(data []byte) (string, int, []string) {
 	cache := make([]string, 0)
   value, size := parseString(data)
 
-  // May fail if string is followed by a symbol
-	if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
+  if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
     if data[size+1] == ';' {
       _, enc_size := parseInt(data[size+2:])
-      size += enc_size + 1 // reference to a symbol
+      size += enc_size + 1
     } else {
       enc_symbol, enc_size := parseString(data[size+2:])
       size += enc_size + 1
