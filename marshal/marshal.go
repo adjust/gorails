@@ -8,8 +8,10 @@ import (
 type MarshalledObject struct {
 	MajorVersion byte
 	MinorVersion byte
+
 	data         []byte
   symbolCache  *[]string
+  size         int
 }
 
 type marshalledObjectType byte
@@ -29,7 +31,11 @@ const (
 )
 
 func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string) *MarshalledObject {
-	return &(MarshalledObject{major_version, minor_version, data, symbolCache})
+	return newMarshalledObjectWithSize(major_version, minor_version, data, len(data), symbolCache)
+}
+
+func newMarshalledObjectWithSize(major_version, minor_version byte, data []byte, size int, symbolCache *[]string) *MarshalledObject {
+	return &(MarshalledObject{major_version, minor_version, data, symbolCache, size})
 }
 
 func CreateMarshalledObject(serialized_data []byte) *MarshalledObject {
@@ -133,10 +139,11 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 
 	value = make([]*MarshalledObject, array_size)
 	for i := int64(0); i < array_size; i++ {
-		value_size := newMarshalledObject(
+		value_size := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
+			0,
       obj.symbolCache,
 		).getSize()
 
@@ -148,6 +155,8 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 		)
 		offset += value_size
 	}
+
+	obj.size = offset
 
 	return
 }
@@ -161,10 +170,8 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 	map_size, offset := parseInt(obj.data[1:])
 	offset += 1
 
-
 	value = make(map[string]*MarshalledObject, map_size)
 	for i := int64(0); i < map_size; i++ {
-
 		k := newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
@@ -173,10 +180,11 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 		)
 		offset += k.getSize()
 
-		value_size := newMarshalledObject(
+		value_size := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
+			0,
       obj.symbolCache,
 		).getSize()
 
@@ -188,9 +196,10 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 		)
 		value[k.toString()] = v
 
-
 		offset += value_size
 	}
+
+	obj.size = offset
 
 	return
 }
@@ -231,6 +240,18 @@ func (obj *MarshalledObject) getSize() int {
 				obj.cacheSymbols(symbol)
 			}
 		}
+	case TYPE_ARRAY:
+		if obj.size == 0 {
+			obj.GetAsArray()
+		}
+
+		return obj.size
+	case TYPE_MAP:
+		if obj.size == 0 {
+			obj.GetAsMap()
+		}
+
+		return obj.size
 	}
 
 	return header_size + data_size
@@ -257,7 +278,6 @@ func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
 	}
 
 	*(obj.symbolCache) = cache
-
 }
 
 func (obj *MarshalledObject) toString() (str string) {
