@@ -1,7 +1,7 @@
 gorails/session
 ===============
 
-[![Build Status](https://travis-ci.org/andrewslotin/gorails.png)](https://travis-ci.org/andrewslotin/gorails)
+[![Build Status](https://travis-ci.org/adeven/gorails.png)](https://travis-ci.org/adeven/gorails)
 
 ## Installation
 
@@ -9,7 +9,7 @@ With Go and git installed:
 
 ```
 go get -u code.google.com/p/go.crypto/pbkdf2
-go get -u github.com/andrewslotin/gorails/session
+go get -u github.com/adeven/gorails/session
 ```
 
 Or you can use [Goem](http://big-elephants.com/2013-09/goem-the-missing-go-extension-manager/).
@@ -17,7 +17,7 @@ Or you can use [Goem](http://big-elephants.com/2013-09/goem-the-missing-go-exten
 ## Usage
 
 ```go
-import "github.com/andrewslotin/gorails/session"
+import "github.com/adeven/gorails/session"
 
 // session_cookie - raw _<your app name>_session cookie
 func getRailsSessionData(session_cookie string) (decrypted_cookie_data []byte, err error) {
@@ -32,4 +32,4 @@ const (
 )
 ```
 
-After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/andrewslotin/gorails/tree/master/marshal)
+After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/adeven/gorails/tree/master/marshal)
