@@ -1,7 +1,7 @@
 gorails
 =======
 
-[![Build Status](https://travis-ci.org/adeven/gorails.png)](https://travis-ci.org/andrewslotin/gorails)
+[![Build Status](https://travis-ci.org/adeven/gorails.png)](https://travis-ci.org/adeven/gorails)
 
 A set of go packages to integrate your Go app into existing Rails project.
 
