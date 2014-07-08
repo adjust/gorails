@@ -226,7 +226,7 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
       obj.objectCache,
 		)
 		obj.cacheObject(v)
-		value[k.toString()] = v
+		value[k.ToString()] = v
 
 		offset += value_size
 	}
@@ -338,7 +338,7 @@ func (obj *MarshalledObject) cacheObject(object *MarshalledObject) {
 	*(obj.objectCache) = cache
 }
 
-func (obj *MarshalledObject) toString() (str string) {
+func (obj *MarshalledObject) ToString() (str string) {
 	switch obj.GetType() {
 	case TYPE_NIL:
 		str = "<nil>"
