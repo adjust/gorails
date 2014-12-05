@@ -1,14 +1,14 @@
 gorails/marshal
 ===============
 
-[![Build Status](https://travis-ci.org/adeven/gorails.png)](https://travis-ci.org/adeven/gorails)
+[![Build Status](https://travis-ci.org/adjust/gorails.png)](https://travis-ci.org/adjust/gorails)
 
 ## Installation
 
 With Go and git installed:
 
 ```
-go get -u github.com/adeven/gorails/marshal
+go get -u github.com/adjust/gorails/marshal
 ```
 
 Or you can use [Goem](http://big-elephants.com/2013-09/goem-the-missing-go-extension-manager/).
@@ -18,7 +18,7 @@ Or you can use [Goem](http://big-elephants.com/2013-09/goem-the-missing-go-exten
 ```go
 import (
   "errors"
-  "github.com/adeven/gorails/marshal"
+  "github.com/adjust/gorails/marshal"
 )
 
 func getAuthUserId(decrypted_session_data []byte) (user_id int64, err error) {
