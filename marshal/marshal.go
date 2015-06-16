@@ -11,6 +11,7 @@ type MarshalledObject struct {
 
 	data         []byte
   symbolCache  *[]string
+  objectCache  *[]*MarshalledObject
   size         int
 }
 
@@ -30,22 +31,27 @@ const (
 	TYPE_MAP     marshalledObjectType = 7
 )
 
-func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string) *MarshalledObject {
-	return newMarshalledObjectWithSize(major_version, minor_version, data, len(data), symbolCache)
+func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
+	return newMarshalledObjectWithSize(major_version, minor_version, data, len(data), symbolCache, objectCache)
 }
 
-func newMarshalledObjectWithSize(major_version, minor_version byte, data []byte, size int, symbolCache *[]string) *MarshalledObject {
-	return &(MarshalledObject{major_version, minor_version, data, symbolCache, size})
+func newMarshalledObjectWithSize(major_version, minor_version byte, data []byte, size int, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
+	return &(MarshalledObject{major_version, minor_version, data, symbolCache, objectCache, size})
 }
 
 func CreateMarshalledObject(serialized_data []byte) *MarshalledObject {
-	cache := []string{}
-	return newMarshalledObject(serialized_data[0], serialized_data[1], serialized_data[2:], &cache)
+	symbolCache := []string{}
+	objectCache := []*MarshalledObject{}
+	return newMarshalledObject(serialized_data[0], serialized_data[1], serialized_data[2:], &symbolCache, &objectCache)
 }
 
 func (obj *MarshalledObject) GetType() marshalledObjectType {
 	if len(obj.data) == 0 {
 		return TYPE_UNKNOWN
+	}
+
+	if ref := obj.resolveObjectLink(); ref != nil {
+		return ref.GetType()
 	}
 
 	switch obj.data[0] {
@@ -107,10 +113,16 @@ func (obj *MarshalledObject) GetAsFloat() (value float64, err error) {
 }
 
 func (obj *MarshalledObject) GetAsString() (value string, err error) {
+	if ref := obj.resolveObjectLink(); ref != nil {
+		return ref.GetAsString()
+	}
+
 	err = assertType(obj, TYPE_STRING)
 	if err != nil {
 		return
 	}
+
+	obj.cacheObject(obj)
 
 	var cache []string
   if obj.data[0] == ':' {
@@ -129,10 +141,16 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 }
 
 func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error) {
+	if ref := obj.resolveObjectLink(); ref != nil {
+		return ref.GetAsArray()
+	}
+
 	err = assertType(obj, TYPE_ARRAY)
 	if err != nil {
 		return
 	}
+
+	obj.cacheObject(obj)
 
 	array_size, offset := parseInt(obj.data[1:])
   offset += 1
@@ -145,6 +163,7 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 			obj.data[offset:],
 			0,
       obj.symbolCache,
+      obj.objectCache,
 		).getSize()
 
 		value[i] = newMarshalledObject(
@@ -152,7 +171,9 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
       obj.symbolCache,
+      obj.objectCache,
 		)
+		obj.cacheObject(value[i])
 		offset += value_size
 	}
 
@@ -162,10 +183,16 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 }
 
 func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err error) {
+	if ref := obj.resolveObjectLink(); ref != nil {
+		return ref.GetAsMap()
+	}
+
 	err = assertType(obj, TYPE_MAP)
 	if err != nil {
 		return
 	}
+
+	obj.cacheObject(obj)
 
 	map_size, offset := parseInt(obj.data[1:])
 	offset += 1
@@ -177,7 +204,9 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.MinorVersion,
 			obj.data[offset:],
       obj.symbolCache,
+      obj.objectCache,
 		)
+		obj.cacheObject(k)
 		offset += k.getSize()
 
 		value_size := newMarshalledObjectWithSize(
@@ -186,6 +215,7 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.data[offset:],
 			0,
       obj.symbolCache,
+      obj.objectCache,
 		).getSize()
 
 		v := newMarshalledObject(
@@ -193,8 +223,10 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
       obj.symbolCache,
+      obj.objectCache,
 		)
-		value[k.toString()] = v
+		obj.cacheObject(v)
+		value[k.ToString()] = v
 
 		offset += value_size
 	}
@@ -214,6 +246,12 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 
 func (obj *MarshalledObject) getSize() int {
 	header_size, data_size := 0, 0
+
+	if len(obj.data) > 0 && obj.data[0] == '@' {
+		header_size = 1
+		_, data_size = parseInt(obj.data[1:])
+		return header_size + data_size
+	}
 
 	switch obj.GetType() {
 	case TYPE_NIL, TYPE_BOOL:
@@ -280,7 +318,27 @@ func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
 	*(obj.symbolCache) = cache
 }
 
-func (obj *MarshalledObject) toString() (str string) {
+func (obj *MarshalledObject) cacheObject(object *MarshalledObject) {
+	if len(object.data) > 0 && (object.data[0] == '@' || object.data[0] == ':' || object.data[0] == ';') {
+		return
+	}
+	if t := obj.GetType(); !(t == TYPE_STRING || t == TYPE_ARRAY || t == TYPE_MAP) {
+		return
+	}
+
+	cache := *(obj.objectCache)
+
+	for _, o := range cache {
+		if object == o {
+			return
+		}
+	}
+	cache = append(cache, object)
+
+	*(obj.objectCache) = cache
+}
+
+func (obj *MarshalledObject) ToString() (str string) {
 	switch obj.GetType() {
 	case TYPE_NIL:
 		str = "<nil>"
@@ -303,6 +361,19 @@ func (obj *MarshalledObject) toString() (str string) {
 	}
 
 	return
+}
+
+func (obj *MarshalledObject) resolveObjectLink() *MarshalledObject {
+	if len(obj.data) > 0 && obj.data[0] == '@' {
+		idx, _ := parseInt(obj.data[1:])
+		cache := *(obj.objectCache)
+
+		if int(idx) < len(cache) {
+			return cache[idx]
+		}
+	}
+
+	return nil
 }
 
 func parseBool(data []byte) (bool, int) {

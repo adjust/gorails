@@ -249,6 +249,7 @@ func TestGetAsArray(t *testing.T) {
 		{[]byte{4, 8, 91, 6, 58, 8, 98, 97, 114}, []string{"bar"}}, // [:bar]
 		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 59, 0, 84, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar", :baz]
 		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 58, 13, 101, 110, 99, 111, 100, 105, 110, 103, 34, 14, 83, 104, 105, 102, 116, 95, 74, 73, 83, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar".force_encoding("SHIFT_JIS"), :baz]
+		{[]byte{4, 8, 91, 7, 73, 34, 6, 120, 6, 58, 6, 69, 84, 64, 6}, []string{"x", "x"}},
 	}
 
 	for _, testCase := range string_tests {
@@ -284,6 +285,11 @@ type getAsMapOfIntsTestCase struct {
 type getAsMapOfStringsTestCase struct {
 	Data        []byte
 	Expectation map[string]string
+}
+
+type getAsMapOfMapsTestCase struct {
+	Data        []byte
+	Expectation map[string]map[string]int64
 }
 
 func TestGetAsMap(t *testing.T) {
@@ -341,6 +347,14 @@ func TestGetAsMap(t *testing.T) {
 				"baz":   "0",   // :baz => "0"
 			},
 		},
+		{
+			[]byte{4, 8, 123, 8, 58, 6, 97, 73, 34, 6, 120, 6, 58, 6, 69, 84, 58, 6, 98, 64, 6, 58, 6, 99, 64, 6},
+			map[string]string{
+				"a":  "x",
+				"b":  "x",
+				"c":  "x",
+			},
+		},
 	}
 
 	for _, testCase := range string_tests {
@@ -349,6 +363,49 @@ func TestGetAsMap(t *testing.T) {
 		m := make(map[string]string)
 		for k, v := range value {
 			m[k], err = v.GetAsString()
+
+			if err != nil {
+				t.Errorf("GetAsMap() returned an error while parsing %s %d: %s", k, v.GetType(), err.Error())
+			}
+		}
+
+		if ! reflect.DeepEqual(m, testCase.Expectation) {
+			t.Errorf("%v is not equal %v", m, testCase.Expectation)
+		}
+	}
+
+	map_tests := []getAsMapOfMapsTestCase{
+		{
+			[]byte{4, 8, 123, 8, 58, 6, 97, 123, 6, 73, 34, 6, 120, 6, 58, 6, 69, 84, 105, 6, 58, 6, 98, 64, 6, 58, 6, 99, 64, 6},
+			map[string]map[string]int64{
+				"a":  map[string]int64{"x": 1},
+				"b":  map[string]int64{"x": 1},
+				"c":  map[string]int64{"x": 1},
+			},
+		},
+	}
+
+	for _, testCase := range map_tests {
+		value, _ := CreateMarshalledObject(testCase.Data).GetAsMap()
+
+		m := make(map[string]map[string]int64)
+		for k, v := range value {
+			vv, err := v.GetAsMap()
+
+			if err != nil {
+				t.Errorf("GetAsMap() returned an error while parsing %s", v)
+			}
+
+			m2 := make(map[string]int64)
+			for k2, v2 := range vv {
+				m2[k2], err = v2.GetAsInteger()
+
+				if err != nil {
+					t.Errorf("GetAsInteger() returned an error while parsing %s", v2)
+				}
+			}
+
+			m[k] = m2
 
 			if err != nil {
 				t.Errorf("GetAsMap() returned an error while parsing %s %d: %s", k, v.GetType(), err.Error())
