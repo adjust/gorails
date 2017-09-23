@@ -8,7 +8,7 @@ gorails/session
 With Go and git installed:
 
 ```
-go get -u code.google.com/p/go.crypto/pbkdf2
+go get -u golang.org/x/crypto/pbkdf2
 go get -u github.com/adjust/gorails/session
 ```
 
