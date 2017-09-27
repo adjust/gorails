@@ -8,11 +8,8 @@ gorails/session
 With Go and git installed:
 
 ```
-go get -u code.google.com/p/go.crypto/pbkdf2
 go get -u github.com/adjust/gorails/session
 ```
-
-Or you can use [Goem](http://big-elephants.com/2013-09/goem-the-missing-go-extension-manager/).
 
 ## Usage
 
