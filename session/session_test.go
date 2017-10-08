@@ -21,23 +21,28 @@ func TestVerifySign(t *testing.T) {
 	cookie, _ := url.QueryUnescape(signedCookie)
 	vectors := strings.SplitN(cookie, "--", 2)
 	// a right signature case
-	if verified := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt); !verified {
-		t.Error("The function verifySign() test failure!")
+	verified, err := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt)
+	if !verified {
+		t.Errorf("verifySign test failure: %v", err)
 	}
-	// a fault signature case
-	faultSignSalt := "fault signature salt"
-	if verified := verifySign(vectors[0], vectors[1], secretKeyBase, faultSignSalt); verified {
-		t.Error("The function verifySign() test failure!")
+	// a wrong signature case
+	faultSignSalt := "wrong signature salt"
+	verified, err = verifySign(vectors[0], vectors[1], secretKeyBase, faultSignSalt)
+	if verified {
+		t.Error("verifySign test with a wrong signature salt passed")
 	}
 }
 
 func TestDecryptSignedCookie(t *testing.T) {
-	cookieData, _ := DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt)
+	cookieData, err := DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt)
+	if err != nil {
+		t.Errorf("DecryptSignedCookie test failure: %v", err)
+	}
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(cookieData, &jsonData); err != nil {
-		t.Error("The function DecryptSignedCookie() test failure!")
+		t.Errorf("DecryptSignedCookie test failure: %v", err)
 	}
 	if jsonData["session_id"] != "b85897340bfedc7e03b7e9479c271439" {
-		t.Error("The function DecryptSignedCookie() test failure!")
+		t.Error("DecryptSignedCookie get wrong values after deserialization")
 	}
 }

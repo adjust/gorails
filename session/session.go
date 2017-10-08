@@ -18,20 +18,20 @@ func generateSecret(base, salt string) []byte {
 	return pbkdf2.Key([]byte(base), []byte(salt), keyIterNum, keySize, sha1.New)
 }
 
-// I stolen the snippet from: https://gist.github.com/doitian/2a89dc9e4372e55335c9111f576b47bf
-func verifySign(encryptedData, sign, base, signSalt string) bool {
+// The origin of this snippet can be found at https://gist.github.com/doitian/2a89dc9e4372e55335c9111f576b47bf
+func verifySign(encryptedData, sign, base, signSalt string) (bool, error) {
 	signKey := generateSecret(base, signSalt)
 	signHmac := hmac.New(sha1.New, signKey)
 	signHmac.Write([]byte(encryptedData))
 	verifySign := signHmac.Sum(nil)
 	signDecoded, err := hex.DecodeString(sign)
 	if err != nil {
-		return false
+		return false, err
 	}
 	if hmac.Equal(verifySign, signDecoded) {
-		return true
+		return true, nil
 	}
-	return false
+	return false, errors.New("session: signature not verified")
 }
 
 func decodeCookieData(cookie []byte) (data, iv []byte, err error) {
@@ -73,10 +73,11 @@ func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (se
 
 	vectors := strings.SplitN(cookie, "--", 2)
 	if vectors[0] == "" || vectors[1] == "" {
-		return nil, errors.New("Invalid cookie!")
+		return nil, errors.New("session: invalid cookie")
 	}
-	if verified := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt); !verified {
-		return nil, errors.New("Not verified signature!")
+	verified, err := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt)
+	if !verified {
+		return
 	}
 
 	data, err := base64.StdEncoding.DecodeString(vectors[0])
