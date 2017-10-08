@@ -16,17 +16,20 @@ go get -u github.com/adjust/gorails/session
 ```go
 import "github.com/adjust/gorails/session"
 
-// session_cookie - raw _<your app name>_session cookie
-func getRailsSessionData(session_cookie string) (decrypted_cookie_data []byte, err error) {
-  decrypted_cookie_data, err = session.DecryptSignedCookie(session_cookie, secret_key_base, salt)
+// sessionCookie - raw _<your app name>_session cookie
+func getRailsSessionData(sessionCookie string) (decryptedCookieData []byte, err error) {
+  decryptedCookieData, err = session.DecryptSignedCookie(sessionCookie, secretKeyBase, salt, signSalt)
 
   return
 }
 
 const (
-  secret_key_base = "..." // can be found in config/initializers/secret_token.rb
-  salt = "encrypted cookie" // default value for Rails 4 app
+  secretKeyBase = "..."                      // can be found in config/initializers/secret_token.rb
+  salt          = "encrypted cookie"         // default value for Rails 4 app
+  signSalt      = "signed encrypted cookie"  // default value for Rails 4 app
 )
 ```
 
-After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/adjust/gorails/tree/master/marshal)
+After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/adjust/gorails/tree/master/marshal) if your Rails version is less than v4.1.
+
+Rails use JSON as its default serializer from v4.1, so you can deserialize the decrypted session data as a common JSON data as what [test](https://github.com/adjust/gorails/blob/master/session/session_test.go) does.
