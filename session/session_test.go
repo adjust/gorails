@@ -20,7 +20,13 @@ const (
 func TestVerifySign(t *testing.T) {
 	cookie, _ := url.QueryUnescape(signedCookie)
 	vectors := strings.SplitN(cookie, "--", 2)
+	// a right signature case
 	if verified := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt); !verified {
+		t.Error("The function verifySign() test failure!")
+	}
+	// a fault signature case
+	faultSignSalt := "fault signature salt"
+	if verified := verifySign(vectors[0], vectors[1], secretKeyBase, faultSignSalt); verified {
 		t.Error("The function verifySign() test failure!")
 	}
 }
