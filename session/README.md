@@ -30,6 +30,6 @@ const (
 )
 ```
 
-After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/adjust/gorails/tree/master/marshal) if your Rails version is less than v4.1.
+After you decrypted session data you might like to deserialize it using [gorails/marshal](https://github.com/adjust/gorails/tree/master/marshal) if your Rails version is less than v4.1 and you use the default serializer config.
 
 Rails use JSON as its default serializer from v4.1, so you can deserialize the decrypted session data as a common JSON data as what [test](https://github.com/adjust/gorails/blob/master/session/session_test.go) does.
