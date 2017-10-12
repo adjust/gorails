@@ -20,16 +20,19 @@ const (
 func TestVerifySign(t *testing.T) {
 	cookie, _ := url.QueryUnescape(signedCookie)
 	vectors := strings.SplitN(cookie, "--", 2)
-	// a right signature case
+	// a valid signature case
 	verified, err := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt)
-	if !verified {
+	if err != nil {
 		t.Errorf("verifySign test failure: %v", err)
 	}
-	// a wrong signature case
+	if !verified {
+		t.Errorf("verifySign test failure: %v", ErrInvalidSignature)
+	}
+	// an invalid signature case
 	faultSignSalt := "wrong signature salt"
 	verified, err = verifySign(vectors[0], vectors[1], secretKeyBase, faultSignSalt)
-	if verified {
-		t.Error("verifySign test with a wrong signature salt passed")
+	if err == nil || verified {
+		t.Error("verifySign test with an invalid signature salt passed")
 	}
 }
 

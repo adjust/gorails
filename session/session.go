@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+var ErrInvalidSignature = errors.New("session: signature not verified")
+
 func generateSecret(base, salt string) []byte {
 	return pbkdf2.Key([]byte(base), []byte(salt), keyIterNum, keySize, sha1.New)
 }
@@ -28,10 +30,10 @@ func verifySign(encryptedData, sign, base, signSalt string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if hmac.Equal(verifySign, signDecoded) {
-		return true, nil
+	if !hmac.Equal(verifySign, signDecoded) {
+		return false, ErrInvalidSignature
 	}
-	return false, errors.New("session: signature not verified")
+	return true, nil
 }
 
 func decodeCookieData(cookie []byte) (data, iv []byte, err error) {
@@ -76,8 +78,11 @@ func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (se
 		return nil, errors.New("session: invalid cookie")
 	}
 	verified, err := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt)
-	if !verified {
+	if err != nil {
 		return
+	}
+	if !verified {
+		return nil, ErrInvalidSignature
 	}
 
 	data, err := base64.StdEncoding.DecodeString(vectors[0])
