@@ -158,7 +158,7 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 
 	value = make([]*MarshalledObject, array_size)
 	for i := int64(0); i < array_size; i++ {
-		value_size := newMarshalledObjectWithSize(
+		value_size, ok := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
@@ -166,6 +166,10 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 			obj.symbolCache,
 			obj.objectCache,
 		).getSize()
+
+		if !ok {
+			return nil, UnsupportedType
+		}
 
 		value[i] = newMarshalledObject(
 			obj.MajorVersion,
@@ -208,9 +212,13 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.objectCache,
 		)
 		obj.cacheObject(k)
-		offset += k.getSize()
+		key_size, ok := k.getSize()
+		if !ok {
+			return nil, UnsupportedType
+		}
+		offset += key_size
 
-		value_size := newMarshalledObjectWithSize(
+		value_size, ok := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
@@ -218,6 +226,10 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.symbolCache,
 			obj.objectCache,
 		).getSize()
+
+		if !ok {
+			return nil, UnsupportedType
+		}
 
 		v := newMarshalledObject(
 			obj.MajorVersion,
@@ -245,13 +257,13 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 	return
 }
 
-func (obj *MarshalledObject) getSize() int {
+func (obj *MarshalledObject) getSize() (size int, ok bool) {
 	header_size, data_size := 0, 0
 
 	if len(obj.data) > 0 && obj.data[0] == '@' {
 		header_size = 1
 		_, data_size = parseInt(obj.data[1:])
-		return header_size + data_size
+		return header_size + data_size, true
 	}
 
 	switch obj.GetType() {
@@ -281,19 +293,27 @@ func (obj *MarshalledObject) getSize() int {
 		}
 	case TYPE_ARRAY:
 		if obj.size == 0 {
-			obj.GetAsArray()
+			_, err := obj.GetAsArray()
+			if err != nil {
+				return 0, false
+			} else {
+				return obj.size, true
+			}
 		}
-
-		return obj.size
 	case TYPE_MAP:
 		if obj.size == 0 {
-			obj.GetAsMap()
+			_, err := obj.GetAsMap()
+			if err != nil {
+				return 0, false
+			} else {
+				return obj.size, true
+			}
 		}
-
-		return obj.size
+	case TYPE_UNKNOWN:
+		return 0, false
 	}
 
-	return header_size + data_size
+	return header_size + data_size, true
 }
 
 func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
