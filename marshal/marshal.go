@@ -9,10 +9,10 @@ type MarshalledObject struct {
 	MajorVersion byte
 	MinorVersion byte
 
-	data         []byte
-  symbolCache  *[]string
-  objectCache  *[]*MarshalledObject
-  size         int
+	data        []byte
+	symbolCache *[]string
+	objectCache *[]*MarshalledObject
+	size        int
 }
 
 type marshalledObjectType byte
@@ -125,13 +125,13 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 	obj.cacheObject(obj)
 
 	var cache []string
-  if obj.data[0] == ':' {
+	if obj.data[0] == ':' {
 		value, _ = parseString(obj.data[1:])
 		obj.cacheSymbols(value)
-  } else if obj.data[0] == ';' {
-  	ref_index, _ := parseInt(obj.data[1:])
-    cache := *(obj.symbolCache)
-    value = cache[ref_index]
+	} else if obj.data[0] == ';' {
+		ref_index, _ := parseInt(obj.data[1:])
+		cache := *(obj.symbolCache)
+		value = cache[ref_index]
 	} else {
 		value, _, cache = parseStringWithEncoding(obj.data[2:])
 		obj.cacheSymbols(cache...)
@@ -153,7 +153,7 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 	obj.cacheObject(obj)
 
 	array_size, offset := parseInt(obj.data[1:])
-  offset += 1
+	offset += 1
 
 	value = make([]*MarshalledObject, array_size)
 	for i := int64(0); i < array_size; i++ {
@@ -162,16 +162,16 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 			obj.MinorVersion,
 			obj.data[offset:],
 			0,
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		).getSize()
 
 		value[i] = newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(value[i])
 		offset += value_size
@@ -203,8 +203,8 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(k)
 		offset += k.getSize()
@@ -214,16 +214,16 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.MinorVersion,
 			obj.data[offset:],
 			0,
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		).getSize()
 
 		v := newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(v)
 		value[k.ToString()] = v
@@ -256,7 +256,7 @@ func (obj *MarshalledObject) getSize() int {
 	switch obj.GetType() {
 	case TYPE_NIL, TYPE_BOOL:
 		header_size = 0
-		data_size   = 1
+		data_size = 1
 	case TYPE_INTEGER:
 		header_size = 1
 		_, data_size = parseInt(obj.data[header_size:])
@@ -310,7 +310,7 @@ func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
 	for _, symbol := range symbols {
 		_, exists := known[symbol]
 
-		if ! exists {
+		if !exists {
 			cache = append(cache, symbol)
 		}
 	}
@@ -414,27 +414,27 @@ func parseString(data []byte) (string, int) {
 	length, header_size := parseInt(data)
 	size := int(length) + header_size
 
-  return string(data[header_size : size]), size
+	return string(data[header_size:size]), size
 }
 
 func parseStringWithEncoding(data []byte) (string, int, []string) {
 	cache := make([]string, 0)
-  value, size := parseString(data)
+	value, size := parseString(data)
 
-  if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
-    if data[size+1] == ';' {
-      _, enc_size := parseInt(data[size+2:])
-      size += enc_size + 1
-    } else {
-      enc_symbol, enc_size := parseString(data[size+2:])
-      size += enc_size + 1
-      cache = append(cache, enc_symbol)
-    }
+	if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
+		if data[size+1] == ';' {
+			_, enc_size := parseInt(data[size+2:])
+			size += enc_size + 1
+		} else {
+			enc_symbol, enc_size := parseString(data[size+2:])
+			size += enc_size + 1
+			cache = append(cache, enc_symbol)
+		}
 
-    if data[size+1] == '"' {
-      encoding, enc_name_size := parseString(data[size+2:])
-      _ = encoding
-      size += enc_name_size + 1
+		if data[size+1] == '"' {
+			encoding, enc_name_size := parseString(data[size+2:])
+			_ = encoding
+			size += enc_name_size + 1
 		} else {
 			_, enc_name_size := parseBool(data[size+1:])
 			size += enc_name_size
@@ -442,7 +442,6 @@ func parseStringWithEncoding(data []byte) (string, int, []string) {
 
 		size += 1
 	}
-
 
 	return value, size, cache
 }
