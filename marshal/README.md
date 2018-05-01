@@ -3,6 +3,10 @@ gorails/marshal
 
 [![Build Status](https://travis-ci.org/adjust/gorails.png)](https://travis-ci.org/adjust/gorails)
 
+This is a parser/unmarshaller for objects serialized via [Ruby's
+Marshal#dump][marshal-dump]. The binary format is [described in some
+depth][marshal-format], if there's need for future extension.
+
 ## Installation
 
 With Go and git installed:
@@ -54,3 +58,10 @@ func getAuthUserId(decrypted_session_data []byte) (user_id int64, err error) {
   return
 }
 ```
+
+## Reference
+
+https://docs.ruby-lang.org/en/2.1.0/marshal_rdoc.html#label-Stream+Format
+
+[marshal-dump]: http://ruby-doc.org/core-2.5.0/Marshal.html#method-c-dump
+[marshal-format]: https://docs.ruby-lang.org/en/2.1.0/marshal_rdoc.html
