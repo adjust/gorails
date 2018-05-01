@@ -53,6 +53,8 @@ func TestGetType(t *testing.T) {
 		// Maps (Ruby hashes)
 		{[]byte{4, 8, 123, 0}, TYPE_MAP},                                                                 // {}
 		{[]byte{4, 8, 123, 6, 58, 8, 102, 111, 111, 73, 34, 8, 98, 97, 114, 6, 58, 6, 69, 84}, TYPE_MAP}, // {foo: "bar"}
+		// Unknown
+		{[]byte{4, 8, 255}, TYPE_UNKNOWN},
 	}
 
 	for _, testCase := range tests {
@@ -414,6 +416,63 @@ func TestGetAsMap(t *testing.T) {
 
 		if !reflect.DeepEqual(m, testCase.Expectation) {
 			t.Errorf("%v is not equal %v", m, testCase.Expectation)
+		}
+	}
+}
+
+type fail_case struct {
+	message string
+	data    []byte
+}
+
+// A type we don't understand inside a map or array means we don't know where the map or array ends.
+// Unfortunately that means we can't interpret the rest of the data. (We could maybe do some sniffing
+// to try to find the next type preamble, but that might find false positives inside the data we don't
+// understand.)
+func TestUnsupportedTypes(t *testing.T) {
+
+	failing_arrays := []fail_case{
+		{"one bad element [ XX ]",
+			[]byte{4, 8, 91, 6, 255},
+		},
+		{"a contained bad array [ [ XX ] ]",
+			[]byte{4, 8, 91, 7, 48, 91, 6, 255},
+		},
+		{"a contained bad map [ { nil => XX } ]",
+			[]byte{4, 8, 91, 6, 123, 6, 48, 255},
+		},
+	}
+
+	failing_maps := []fail_case{
+		{"an unsupported key type { XX => nil }",
+			[]byte{4, 8, 123, 6, 255, 48},
+		},
+		{"an unsupported value type { nil => XX }",
+			[]byte{4, 8, 123, 6, 48, 255},
+		},
+		{"a contained bad array { nil => [ XX ] }",
+			[]byte{4, 8, 123, 6, 48, 91, 6, 255},
+		},
+		{"a contained bad map { nil => { nil => XX } }",
+			[]byte{4, 8, 123, 6, 48, 123, 6, 48, 255},
+		},
+	}
+
+	for _, test_case := range failing_arrays {
+		value, err := CreateMarshalledObject(test_case.data).GetAsArray()
+		if err != UnsupportedType {
+			t.Errorf("Unmarshalling an array with %s should fail with UnsupportedType", test_case.message)
+		} else if value != nil {
+			t.Errorf("Unsupported array with %s should return no value along with the error", test_case.message)
+		}
+	}
+
+	for _, test_case := range failing_maps {
+		value, err := CreateMarshalledObject(test_case.data).GetAsMap()
+		if err != UnsupportedType {
+			t.Errorf("Unmarshalling a map with %s should fail with UnsupportedType", test_case.message)
+		} else if value != nil {
+			t.Errorf("Unsupported map with %s should return no value along with the error", test_case.message)
 		}
 	}
 }

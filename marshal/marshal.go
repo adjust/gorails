@@ -19,6 +19,7 @@ type marshalledObjectType byte
 
 var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast a marshalled object")
 var IncompleteData = errors.New("gorails/marshal: incomplete data")
+var UnsupportedType = errors.New("gorails/marshal: An unsupported type is nested within a map or array")
 
 const (
 	TYPE_UNKNOWN marshalledObjectType = 0
