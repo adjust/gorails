@@ -228,13 +228,13 @@ func TestGetAsArray(t *testing.T) {
 		}
 
 		if len(value) != len(testCase.Expectation) {
-			t.Error("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
+			t.Errorf("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
 		} else {
 			for i, v := range value {
 				value, err := v.GetAsInteger()
 
 				if err != nil {
-					t.Error("GetAsArray() returned an error '%v' for element #%d (%d) of %v", err.Error(), i, testCase.Expectation[i], testCase.Expectation)
+					t.Errorf("GetAsArray() returned an error '%v' for element #%d (%d) of %v", err.Error(), i, testCase.Expectation[i], testCase.Expectation)
 				}
 
 				if value != testCase.Expectation[i] {
@@ -393,7 +393,7 @@ func TestGetAsMap(t *testing.T) {
 			vv, err := v.GetAsMap()
 
 			if err != nil {
-				t.Errorf("GetAsMap() returned an error while parsing %s", v)
+				t.Errorf("GetAsMap() returned an error while parsing %v", v)
 			}
 
 			m2 := make(map[string]int64)
@@ -401,7 +401,7 @@ func TestGetAsMap(t *testing.T) {
 				m2[k2], err = v2.GetAsInteger()
 
 				if err != nil {
-					t.Errorf("GetAsInteger() returned an error while parsing %s", v2)
+					t.Errorf("GetAsInteger() returned an error while parsing %v", v2)
 				}
 			}
 
