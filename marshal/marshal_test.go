@@ -435,7 +435,7 @@ func TestUnsupportedTypes(t *testing.T) {
 		{"one bad element [ XX ]",
 			[]byte{4, 8, 91, 6, 255},
 		},
-		{"a contained bad array [ [ XX ] ]",
+		{"a contained bad array [ nil, [ XX ] ]",
 			[]byte{4, 8, 91, 7, 48, 91, 6, 255},
 		},
 		{"a contained bad map [ { nil => XX } ]",
@@ -473,6 +473,56 @@ func TestUnsupportedTypes(t *testing.T) {
 			t.Errorf("Unmarshalling a map with %s should fail with UnsupportedType", test_case.message)
 		} else if value != nil {
 			t.Errorf("Unsupported map with %s should return no value along with the error", test_case.message)
+		}
+	}
+}
+
+// We don't know how to actually un-marshal the object, but we can still determine its length
+// (which lets us deserialize the rest of the data)
+func TestUserDefinedSerialization(t *testing.T) {
+	// v4.8, u, :Time, 8-byte sequence
+	user_data := []byte{4, 8, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46}
+	obj := CreateMarshalledObject(user_data)
+	if obj.GetType() != TYPE_USER_DEFINED {
+		t.Fatal("should recognize a user-defined serialization")
+	}
+
+	// v4.8 [ user-defined, true ]
+	// We should be able to extract an object after the user-defined serialization
+	array_data := []byte{4, 8, 91, 7, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 84}
+	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
+	if err != nil {
+		t.Error("Error parsing array containing a user-defined serialization:", err)
+	} else if len(array_value) != 2 {
+		t.Errorf("Incorrect length for array containing a user-defined serialization, %d instead of %d", len(array_value), 2)
+	} else {
+		bool_val, err := array_value[1].GetAsBool()
+		if err != nil {
+			t.Error("Error parsing array value after a user-defined serialization:", err)
+		} else if bool_val != true {
+			t.Error("Boolean value in array after user-defined serialization was corrupted")
+		}
+	}
+
+	maps := [][]byte{
+		// v4.8 { nil => user-defined, true => true }
+		[]byte{4, 8, 123, 7, 48, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 84, 84},
+		// v4.8 { user-defined => nil, true => true }
+		[]byte{4, 8, 123, 7, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 48, 84, 84},
+	}
+	for _, map_data := range maps {
+		map_value, err := CreateMarshalledObject(map_data).GetAsMap()
+		if err != nil {
+			t.Error("Error parsing map containing a user-defined serialization:", err)
+		} else if len(map_value) != 2 {
+			t.Errorf("Incorrect length for map containing a user-defined serialization, %d instead of %d", len(map_value), 2)
+		} else {
+			bool_val, err := map_value["true"].GetAsBool()
+			if err != nil {
+				t.Error("Error parsing map entry after a user-defined serialization:", err)
+			} else if bool_val != true {
+				t.Error("Boolean value in map after user-defined serialization was corrupted")
+			}
 		}
 	}
 }
