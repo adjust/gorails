@@ -164,7 +164,7 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 
 	value = make([]*MarshalledObject, array_size)
 	for i := int64(0); i < array_size; i++ {
-		value_size, ok := newMarshalledObjectWithSize(
+		value_size, err := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
@@ -173,8 +173,8 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 			obj.objectCache,
 		).getSize()
 
-		if !ok {
-			return nil, UnsupportedType
+		if err != nil {
+			return nil, err
 		}
 
 		value[i] = newMarshalledObject(
@@ -238,13 +238,13 @@ func (obj *MarshalledObject) getMaplike(hasType bool) (value map[*MarshalledObje
 			obj.objectCache,
 		)
 		obj.cacheObject(k)
-		key_size, ok := k.getSize()
-		if !ok {
-			return nil, UnsupportedType
+		key_size, err := k.getSize()
+		if err != nil {
+			return nil, err
 		}
 		offset += key_size
 
-		value_size, ok := newMarshalledObjectWithSize(
+		value_size, err := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
@@ -253,8 +253,8 @@ func (obj *MarshalledObject) getMaplike(hasType bool) (value map[*MarshalledObje
 			obj.objectCache,
 		).getSize()
 
-		if !ok {
-			return nil, UnsupportedType
+		if err != nil {
+			return nil, err
 		}
 
 		v := newMarshalledObject(
@@ -283,13 +283,13 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 	return
 }
 
-func (obj *MarshalledObject) getSize() (size int, ok bool) {
+func (obj *MarshalledObject) getSize() (size int, err error) {
 	header_size, data_size := 0, 0
 
 	if len(obj.data) > 0 && obj.data[0] == '@' {
 		header_size = 1
 		_, data_size = parseInt(obj.data[1:])
-		return header_size + data_size, true
+		return header_size + data_size, nil
 	}
 
 	switch obj.GetType() {
@@ -325,9 +325,9 @@ func (obj *MarshalledObject) getSize() (size int, ok bool) {
 			obj.symbolCache,
 			obj.objectCache,
 		)
-		class_name_len, ok := class_name.getSize()
-		if !ok {
-			return 0, false
+		class_name_len, err := class_name.getSize()
+		if err != nil {
+			return 0, err
 		}
 		byte_sequence := obj.data[1+class_name_len:]
 		sequence_length, int_length := parseInt(byte_sequence)
@@ -342,9 +342,9 @@ func (obj *MarshalledObject) getSize() (size int, ok bool) {
 			obj.symbolCache,
 			obj.objectCache,
 		)
-		main_obj_len, ok := main_obj.getSize()
-		if !ok {
-			return 0, false
+		main_obj_len, err := main_obj.getSize()
+		if err != nil {
+			return 0, err
 		}
 		ivars := newMarshalledObject(
 			obj.MajorVersion,
@@ -361,25 +361,25 @@ func (obj *MarshalledObject) getSize() (size int, ok bool) {
 		if obj.size == 0 {
 			_, err := obj.GetAsArray()
 			if err != nil {
-				return 0, false
+				return 0, err
 			} else {
-				return obj.size, true
+				return obj.size, nil
 			}
 		}
 	case TYPE_MAP:
 		if obj.size == 0 {
 			_, err := obj.GetAsMap()
 			if err != nil {
-				return 0, false
+				return 0, err
 			} else {
-				return obj.size, true
+				return obj.size, nil
 			}
 		}
 	case TYPE_UNKNOWN:
-		return 0, false
+		return 0, UnsupportedType
 	}
 
-	return header_size + data_size, true
+	return header_size + data_size, nil
 }
 
 func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
