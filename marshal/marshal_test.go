@@ -461,7 +461,7 @@ func TestUnsupportedTypes(t *testing.T) {
 
 	for _, test_case := range failing_arrays {
 		value, err := CreateMarshalledObject(test_case.data).GetAsArray()
-		if err != UnsupportedType {
+		if _, ok := err.(UnsupportedType); !ok {
 			t.Errorf("Unmarshalling an array with %s should fail with UnsupportedType", test_case.message)
 		} else if value != nil {
 			t.Errorf("Unsupported array with %s should return no value along with the error", test_case.message)
@@ -470,7 +470,7 @@ func TestUnsupportedTypes(t *testing.T) {
 
 	for _, test_case := range failing_maps {
 		value, err := CreateMarshalledObject(test_case.data).GetAsMap()
-		if err != UnsupportedType {
+		if _, ok := err.(UnsupportedType); !ok {
 			t.Errorf("Unmarshalling a map with %s should fail with UnsupportedType", test_case.message)
 		} else if value != nil {
 			t.Errorf("Unsupported map with %s should return no value along with the error", test_case.message)

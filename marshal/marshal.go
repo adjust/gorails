@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -19,7 +20,14 @@ type marshalledObjectType byte
 
 var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast a marshalled object")
 var IncompleteData = errors.New("gorails/marshal: incomplete data")
-var UnsupportedType = errors.New("gorails/marshal: An unsupported type is nested within a map or array")
+
+type UnsupportedType struct {
+	type_char byte
+}
+
+func (e UnsupportedType) Error() string {
+	return fmt.Sprintf("gorails/marshal: An unsupported type %q is nested within a map or array", e.type_char)
+}
 
 const (
 	TYPE_UNKNOWN            marshalledObjectType = 0
@@ -203,6 +211,8 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 		return
 	}
 
+	obj.cacheObject(obj)
+
 	pairs, err := obj.getMaplike(true)
 	if err != nil {
 		return
@@ -217,8 +227,6 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 
 // type-char (optional), integer (number of pairs), key, value, key, value, ...
 func (obj *MarshalledObject) getMaplike(hasType bool) (value map[*MarshalledObject]*MarshalledObject, err error) {
-	obj.cacheObject(obj)
-
 	var map_size int64
 	var offset int
 	if hasType {
@@ -317,6 +325,7 @@ func (obj *MarshalledObject) getSize() (size int, err error) {
 				obj.cacheSymbols(symbol)
 			}
 		}
+
 	case TYPE_USER_DEFINED:
 		class_name := newMarshalledObject(
 			obj.MajorVersion,
@@ -334,6 +343,7 @@ func (obj *MarshalledObject) getSize() (size int, err error) {
 
 		header_size = 1
 		data_size = class_name_len + int_length + int(sequence_length)
+
 	case TYPE_INSTANCE_VARIABLES:
 		main_obj := newMarshalledObject(
 			obj.MajorVersion,
@@ -353,8 +363,10 @@ func (obj *MarshalledObject) getSize() (size int, err error) {
 			obj.symbolCache,
 			obj.objectCache,
 		)
-		ivars.getMaplike(false)
-
+		_, err = ivars.getMaplike(false)
+		if err != nil {
+			return 0, err
+		}
 		header_size = 1
 		data_size = main_obj_len + ivars.size
 	case TYPE_ARRAY:
@@ -376,7 +388,7 @@ func (obj *MarshalledObject) getSize() (size int, err error) {
 			}
 		}
 	case TYPE_UNKNOWN:
-		return 0, UnsupportedType
+		return 0, UnsupportedType{obj.data[0]}
 	}
 
 	return header_size + data_size, nil
