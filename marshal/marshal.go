@@ -73,6 +73,8 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 	case 'I':
 		if len(obj.data) > 1 && obj.data[1] == '"' {
 			return TYPE_STRING
+		} else {
+			return TYPE_INSTANCE_VARIABLES
 		}
 	case '[':
 		return TYPE_ARRAY
@@ -201,12 +203,26 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 		return
 	}
 
+	pairs, err := obj.getMaplike()
+	if err != nil {
+		return
+	}
+
+	value = make(map[string]*MarshalledObject, len(pairs))
+	for k, v := range pairs {
+		value[k.ToString()] = v
+	}
+	return
+}
+
+// integer (number of pairs), key, value, key, value, ...
+func (obj *MarshalledObject) getMaplike() (value map[*MarshalledObject]*MarshalledObject, err error) {
 	obj.cacheObject(obj)
 
 	map_size, offset := parseInt(obj.data[1:])
 	offset += 1
 
-	value = make(map[string]*MarshalledObject, map_size)
+	value = make(map[*MarshalledObject]*MarshalledObject, map_size)
 	for i := int64(0); i < map_size; i++ {
 		k := newMarshalledObject(
 			obj.MajorVersion,
@@ -243,7 +259,7 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 			obj.objectCache,
 		)
 		obj.cacheObject(v)
-		value[k.ToString()] = v
+		value[k] = v
 
 		offset += value_size
 	}
