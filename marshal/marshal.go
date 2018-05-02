@@ -67,6 +67,8 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 		return TYPE_FLOAT
 	case ':', ';':
 		return TYPE_STRING
+	case 'u':
+		return TYPE_USER_DEFINED
 	case 'I':
 		if len(obj.data) > 1 && obj.data[1] == '"' {
 			return TYPE_STRING
@@ -292,6 +294,23 @@ func (obj *MarshalledObject) getSize() (size int, ok bool) {
 				obj.cacheSymbols(symbol)
 			}
 		}
+	case TYPE_USER_DEFINED:
+		class_name := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		class_name_len, ok := class_name.getSize()
+		if !ok {
+			return 0, false
+		}
+		byte_sequence := obj.data[1+class_name_len:]
+		sequence_length, int_length := parseInt(byte_sequence)
+
+		header_size = 1
+		data_size = class_name_len + int_length + int(sequence_length)
 	case TYPE_ARRAY:
 		if obj.size == 0 {
 			_, err := obj.GetAsArray()
