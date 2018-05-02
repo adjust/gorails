@@ -203,7 +203,7 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 		return
 	}
 
-	pairs, err := obj.getMaplike()
+	pairs, err := obj.getMaplike(true)
 	if err != nil {
 		return
 	}
@@ -215,12 +215,18 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 	return
 }
 
-// integer (number of pairs), key, value, key, value, ...
-func (obj *MarshalledObject) getMaplike() (value map[*MarshalledObject]*MarshalledObject, err error) {
+// type-char (optional), integer (number of pairs), key, value, key, value, ...
+func (obj *MarshalledObject) getMaplike(hasType bool) (value map[*MarshalledObject]*MarshalledObject, err error) {
 	obj.cacheObject(obj)
 
-	map_size, offset := parseInt(obj.data[1:])
-	offset += 1
+	var map_size int64
+	var offset int
+	if hasType {
+		map_size, offset = parseInt(obj.data[1:])
+		offset += 1
+	} else {
+		map_size, offset = parseInt(obj.data)
+	}
 
 	value = make(map[*MarshalledObject]*MarshalledObject, map_size)
 	for i := int64(0); i < map_size; i++ {
@@ -328,6 +334,29 @@ func (obj *MarshalledObject) getSize() (size int, ok bool) {
 
 		header_size = 1
 		data_size = class_name_len + int_length + int(sequence_length)
+	case TYPE_INSTANCE_VARIABLES:
+		main_obj := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		main_obj_len, ok := main_obj.getSize()
+		if !ok {
+			return 0, false
+		}
+		ivars := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1+main_obj_len:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		ivars.getMaplike(false)
+
+		header_size = 1
+		data_size = main_obj_len + ivars.size
 	case TYPE_ARRAY:
 		if obj.size == 0 {
 			_, err := obj.GetAsArray()
