@@ -59,9 +59,5 @@ func getAuthUserId(decrypted_session_data []byte) (user_id int64, err error) {
 }
 ```
 
-## Reference
-
-https://docs.ruby-lang.org/en/2.1.0/marshal_rdoc.html#label-Stream+Format
-
 [marshal-dump]: http://ruby-doc.org/core-2.5.0/Marshal.html#method-c-dump
 [marshal-format]: https://docs.ruby-lang.org/en/2.1.0/marshal_rdoc.html
