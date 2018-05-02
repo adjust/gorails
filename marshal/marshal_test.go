@@ -526,3 +526,54 @@ func TestUserDefinedSerialization(t *testing.T) {
 		}
 	}
 }
+
+func TestInstanceVars(t *testing.T) {
+	// nil with one instance variable, :key => nil
+	// (nil wouldn't ever really have instance vars, but this is a reduced test case)
+	// v4.8, I, nil, 1, :k, nil
+	instance_data := []byte{4, 8, 73, 48, 6, 58, 6, 107, 48}
+
+	obj := CreateMarshalledObject(instance_data)
+	if obj.GetType() != TYPE_INSTANCE_VARIABLES {
+		t.Fatal("should recognize instance variable definition")
+	}
+
+	// v4.8, I, nil, 1, :k, nil
+	// We should be able to extract an object after instance variable definitions
+	array_data := []byte{4, 8, 91, 7, 73, 48, 6, 58, 6, 107, 48, 84}
+	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
+	if err != nil {
+		t.Error("Error parsing array containing an instance variable definition:", err)
+	} else if len(array_value) != 2 {
+		t.Errorf("Incorrect length for array containing an instance variable definition, %d instead of %d", len(array_value), 2)
+	} else {
+		bool_val, err := array_value[1].GetAsBool()
+		if err != nil {
+			t.Error("Error parsing array value after instance variable definition:", err)
+		} else if bool_val != true {
+			t.Error("Boolean value in array after instance variable definition was corrupted")
+		}
+	}
+
+	maps := [][]byte{
+		// v4.8 { nil => ivar-definition, true => true }
+		[]byte{4, 8, 123, 7, 48, 73, 48, 6, 58, 6, 107, 48, 84, 84},
+		// v4.8 { ivar-definition => nil, true => true }
+		[]byte{4, 8, 123, 7, 73, 48, 6, 58, 6, 107, 48, 48, 84, 84},
+	}
+	for _, map_data := range maps {
+		map_value, err := CreateMarshalledObject(map_data).GetAsMap()
+		if err != nil {
+			t.Error("Error parsing map containing an instance variable definition:", err)
+		} else if len(map_value) != 2 {
+			t.Errorf("Incorrect length for map containing an instance variable definition, %d instead of %d", len(map_value), 2)
+		} else {
+			bool_val, err := map_value["true"].GetAsBool()
+			if err != nil {
+				t.Error("Error parsing map entry after an instance variable definition:", err)
+			} else if bool_val != true {
+				t.Error("Boolean value in map after instance variable definition was corrupted")
+			}
+		}
+	}
+}

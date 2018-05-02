@@ -22,15 +22,16 @@ var IncompleteData = errors.New("gorails/marshal: incomplete data")
 var UnsupportedType = errors.New("gorails/marshal: An unsupported type is nested within a map or array")
 
 const (
-	TYPE_UNKNOWN      marshalledObjectType = 0
-	TYPE_NIL          marshalledObjectType = 1
-	TYPE_BOOL         marshalledObjectType = 2
-	TYPE_INTEGER      marshalledObjectType = 3
-	TYPE_FLOAT        marshalledObjectType = 4
-	TYPE_STRING       marshalledObjectType = 5
-	TYPE_ARRAY        marshalledObjectType = 6
-	TYPE_MAP          marshalledObjectType = 7
-	TYPE_USER_DEFINED marshalledObjectType = 8
+	TYPE_UNKNOWN            marshalledObjectType = 0
+	TYPE_NIL                marshalledObjectType = 1
+	TYPE_BOOL               marshalledObjectType = 2
+	TYPE_INTEGER            marshalledObjectType = 3
+	TYPE_FLOAT              marshalledObjectType = 4
+	TYPE_STRING             marshalledObjectType = 5
+	TYPE_ARRAY              marshalledObjectType = 6
+	TYPE_MAP                marshalledObjectType = 7
+	TYPE_USER_DEFINED       marshalledObjectType = 8
+	TYPE_INSTANCE_VARIABLES marshalledObjectType = 9
 )
 
 func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
