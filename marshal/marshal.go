@@ -74,7 +74,7 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 		return TYPE_INTEGER
 	case 'f':
 		return TYPE_FLOAT
-	case ':', ';':
+	case ':', ';', '"':
 		return TYPE_STRING
 	case 'u':
 		return TYPE_USER_DEFINED
@@ -147,6 +147,8 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 		ref_index, _ := parseInt(obj.data[1:])
 		cache := *(obj.symbolCache)
 		value = cache[ref_index]
+	} else if obj.data[0] == '"' {
+		value, _ = parseString(obj.data[1:])
 	} else {
 		value, _, cache = parseStringWithEncoding(obj.data[2:])
 		obj.cacheSymbols(cache...)

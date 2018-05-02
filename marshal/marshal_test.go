@@ -179,6 +179,7 @@ type getAsStringTestCase struct {
 
 func TestGetAsString(t *testing.T) {
 	tests := []getAsStringTestCase{
+		{[]byte{4, 8, 34, 7, 104, 105}, "hi"},                                                                                 // a binary-encoded string
 		{[]byte{4, 8, 73, 34, 0, 6, 58, 6, 69, 84}, ""},                                                                       // ''
 		{[]byte{4, 8, 58, 10, 104, 101, 108, 108, 111}, "hello"},                                                              // :hello
 		{[]byte{4, 8, 73, 34, 17, 72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 6, 58, 6, 69, 84}, "Hello, world"}, // 'Hello, world'
