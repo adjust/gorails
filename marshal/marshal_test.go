@@ -580,9 +580,9 @@ func TestInstanceVars(t *testing.T) {
 }
 
 func TestObjectInstances(t *testing.T) {
-	// An object of a class "C", with one instance var @k = true
+	// An object of a class "C", with one instance var @k = nil
 	// v4.8, o, :C, :@k, true
-	object_data := []byte{4, 8, 111, 58, 6, 67, 6, 58, 7, 64, 107, 84}
+	object_data := []byte{4, 8, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48}
 
 	obj := CreateMarshalledObject(object_data)
 	if obj.GetType() != TYPE_OBJECT_INSTANCE {
@@ -591,7 +591,7 @@ func TestObjectInstances(t *testing.T) {
 
 	// We should be able to extract an object after an Object instance
 	// v4.8, [, 2, {o, :C, :@k, true}, true]
-	array_data := []byte{4, 8, 91, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 84, 84}
+	array_data := []byte{4, 8, 91, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 84}
 	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
 	if err != nil {
 		t.Error("Error parsing array containing an Object instance:", err)
@@ -608,9 +608,9 @@ func TestObjectInstances(t *testing.T) {
 
 	maps := [][]byte{
 		// v4.8 { nil => obj, true => true }
-		[]byte{4, 8, 123, 7, 48, 111, 58, 6, 67, 6, 58, 7, 64, 107, 84, 84, 84},
+		[]byte{4, 8, 123, 7, 48, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 84, 84},
 		// v4.8 { obj => nil, true => true }
-		[]byte{4, 8, 123, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 84, 48, 84, 84},
+		[]byte{4, 8, 123, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 48, 84, 84},
 	}
 	for _, map_data := range maps {
 		map_value, err := CreateMarshalledObject(map_data).GetAsMap()

@@ -40,7 +40,7 @@ const (
 	TYPE_MAP                marshalledObjectType = 7
 	TYPE_USER_DEFINED       marshalledObjectType = 8
 	TYPE_INSTANCE_VARIABLES marshalledObjectType = 9
-	TYPE_OBJECT_INSTANCE    marshalledObjectType = 9
+	TYPE_OBJECT_INSTANCE    marshalledObjectType = 10
 )
 
 func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
@@ -85,6 +85,8 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 		} else {
 			return TYPE_INSTANCE_VARIABLES
 		}
+	case 'o':
+		return TYPE_OBJECT_INSTANCE
 	case '[':
 		return TYPE_ARRAY
 	case '{':
@@ -347,7 +349,7 @@ func (obj *MarshalledObject) getSize() (size int, err error) {
 		header_size = 1
 		data_size = class_name_len + int_length + int(sequence_length)
 
-	case TYPE_INSTANCE_VARIABLES:
+	case TYPE_INSTANCE_VARIABLES, TYPE_OBJECT_INSTANCE:
 		main_obj := newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
