@@ -40,6 +40,7 @@ const (
 	TYPE_MAP                marshalledObjectType = 7
 	TYPE_USER_DEFINED       marshalledObjectType = 8
 	TYPE_INSTANCE_VARIABLES marshalledObjectType = 9
+	TYPE_OBJECT_INSTANCE    marshalledObjectType = 9
 )
 
 func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
