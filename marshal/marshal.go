@@ -2,6 +2,7 @@ package marshal
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -9,10 +10,10 @@ type MarshalledObject struct {
 	MajorVersion byte
 	MinorVersion byte
 
-	data         []byte
-  symbolCache  *[]string
-  objectCache  *[]*MarshalledObject
-  size         int
+	data        []byte
+	symbolCache *[]string
+	objectCache *[]*MarshalledObject
+	size        int
 }
 
 type marshalledObjectType byte
@@ -20,15 +21,26 @@ type marshalledObjectType byte
 var TypeMismatch = errors.New("gorails/marshal: an attempt to implicitly typecast a marshalled object")
 var IncompleteData = errors.New("gorails/marshal: incomplete data")
 
+type UnsupportedType struct {
+	type_char byte
+}
+
+func (e UnsupportedType) Error() string {
+	return fmt.Sprintf("gorails/marshal: An unsupported type %q is nested within a map or array", e.type_char)
+}
+
 const (
-	TYPE_UNKNOWN marshalledObjectType = 0
-	TYPE_NIL     marshalledObjectType = 1
-	TYPE_BOOL    marshalledObjectType = 2
-	TYPE_INTEGER marshalledObjectType = 3
-	TYPE_FLOAT   marshalledObjectType = 4
-	TYPE_STRING  marshalledObjectType = 5
-	TYPE_ARRAY   marshalledObjectType = 6
-	TYPE_MAP     marshalledObjectType = 7
+	TYPE_UNKNOWN            marshalledObjectType = 0
+	TYPE_NIL                marshalledObjectType = 1
+	TYPE_BOOL               marshalledObjectType = 2
+	TYPE_INTEGER            marshalledObjectType = 3
+	TYPE_FLOAT              marshalledObjectType = 4
+	TYPE_STRING             marshalledObjectType = 5
+	TYPE_ARRAY              marshalledObjectType = 6
+	TYPE_MAP                marshalledObjectType = 7
+	TYPE_USER_DEFINED       marshalledObjectType = 8
+	TYPE_INSTANCE_VARIABLES marshalledObjectType = 9
+	TYPE_OBJECT_INSTANCE    marshalledObjectType = 10
 )
 
 func newMarshalledObject(major_version, minor_version byte, data []byte, symbolCache *[]string, objectCache *[]*MarshalledObject) *MarshalledObject {
@@ -63,12 +75,18 @@ func (obj *MarshalledObject) GetType() marshalledObjectType {
 		return TYPE_INTEGER
 	case 'f':
 		return TYPE_FLOAT
-	case ':', ';':
+	case ':', ';', '"':
 		return TYPE_STRING
+	case 'u':
+		return TYPE_USER_DEFINED
 	case 'I':
 		if len(obj.data) > 1 && obj.data[1] == '"' {
 			return TYPE_STRING
+		} else {
+			return TYPE_INSTANCE_VARIABLES
 		}
+	case 'o':
+		return TYPE_OBJECT_INSTANCE
 	case '[':
 		return TYPE_ARRAY
 	case '{':
@@ -125,13 +143,15 @@ func (obj *MarshalledObject) GetAsString() (value string, err error) {
 	obj.cacheObject(obj)
 
 	var cache []string
-  if obj.data[0] == ':' {
+	if obj.data[0] == ':' {
 		value, _ = parseString(obj.data[1:])
 		obj.cacheSymbols(value)
-  } else if obj.data[0] == ';' {
-  	ref_index, _ := parseInt(obj.data[1:])
-    cache := *(obj.symbolCache)
-    value = cache[ref_index]
+	} else if obj.data[0] == ';' {
+		ref_index, _ := parseInt(obj.data[1:])
+		cache := *(obj.symbolCache)
+		value = cache[ref_index]
+	} else if obj.data[0] == '"' {
+		value, _ = parseString(obj.data[1:])
 	} else {
 		value, _, cache = parseStringWithEncoding(obj.data[2:])
 		obj.cacheSymbols(cache...)
@@ -153,25 +173,29 @@ func (obj *MarshalledObject) GetAsArray() (value []*MarshalledObject, err error)
 	obj.cacheObject(obj)
 
 	array_size, offset := parseInt(obj.data[1:])
-  offset += 1
+	offset += 1
 
 	value = make([]*MarshalledObject, array_size)
 	for i := int64(0); i < array_size; i++ {
-		value_size := newMarshalledObjectWithSize(
+		value_size, err := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
 			0,
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		).getSize()
+
+		if err != nil {
+			return nil, err
+		}
 
 		value[i] = newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(value[i])
 		offset += value_size
@@ -194,39 +218,67 @@ func (obj *MarshalledObject) GetAsMap() (value map[string]*MarshalledObject, err
 
 	obj.cacheObject(obj)
 
-	map_size, offset := parseInt(obj.data[1:])
-	offset += 1
+	pairs, err := obj.getMaplike(true)
+	if err != nil {
+		return
+	}
 
-	value = make(map[string]*MarshalledObject, map_size)
+	value = make(map[string]*MarshalledObject, len(pairs))
+	for k, v := range pairs {
+		value[k.ToString()] = v
+	}
+	return
+}
+
+// type-char (optional), integer (number of pairs), key, value, key, value, ...
+func (obj *MarshalledObject) getMaplike(hasType bool) (value map[*MarshalledObject]*MarshalledObject, err error) {
+	var map_size int64
+	var offset int
+	if hasType {
+		map_size, offset = parseInt(obj.data[1:])
+		offset += 1
+	} else {
+		map_size, offset = parseInt(obj.data)
+	}
+
+	value = make(map[*MarshalledObject]*MarshalledObject, map_size)
 	for i := int64(0); i < map_size; i++ {
 		k := newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(k)
-		offset += k.getSize()
+		key_size, err := k.getSize()
+		if err != nil {
+			return nil, err
+		}
+		offset += key_size
 
-		value_size := newMarshalledObjectWithSize(
+		value_size, err := newMarshalledObjectWithSize(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:],
 			0,
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		).getSize()
+
+		if err != nil {
+			return nil, err
+		}
 
 		v := newMarshalledObject(
 			obj.MajorVersion,
 			obj.MinorVersion,
 			obj.data[offset:offset+value_size],
-      obj.symbolCache,
-      obj.objectCache,
+			obj.symbolCache,
+			obj.objectCache,
 		)
 		obj.cacheObject(v)
-		value[k.ToString()] = v
+		value[k] = v
 
 		offset += value_size
 	}
@@ -244,19 +296,19 @@ func assertType(obj *MarshalledObject, expected_type marshalledObjectType) (err 
 	return
 }
 
-func (obj *MarshalledObject) getSize() int {
+func (obj *MarshalledObject) getSize() (size int, err error) {
 	header_size, data_size := 0, 0
 
 	if len(obj.data) > 0 && obj.data[0] == '@' {
 		header_size = 1
 		_, data_size = parseInt(obj.data[1:])
-		return header_size + data_size
+		return header_size + data_size, nil
 	}
 
 	switch obj.GetType() {
 	case TYPE_NIL, TYPE_BOOL:
 		header_size = 0
-		data_size   = 1
+		data_size = 1
 	case TYPE_INTEGER:
 		header_size = 1
 		_, data_size = parseInt(obj.data[header_size:])
@@ -278,21 +330,73 @@ func (obj *MarshalledObject) getSize() int {
 				obj.cacheSymbols(symbol)
 			}
 		}
+
+	case TYPE_USER_DEFINED:
+		class_name := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		class_name_len, err := class_name.getSize()
+		if err != nil {
+			return 0, err
+		}
+		byte_sequence := obj.data[1+class_name_len:]
+		sequence_length, int_length := parseInt(byte_sequence)
+
+		header_size = 1
+		data_size = class_name_len + int_length + int(sequence_length)
+
+	case TYPE_INSTANCE_VARIABLES, TYPE_OBJECT_INSTANCE:
+		main_obj := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		main_obj_len, err := main_obj.getSize()
+		if err != nil {
+			return 0, err
+		}
+		ivars := newMarshalledObject(
+			obj.MajorVersion,
+			obj.MinorVersion,
+			obj.data[1+main_obj_len:],
+			obj.symbolCache,
+			obj.objectCache,
+		)
+		_, err = ivars.getMaplike(false)
+		if err != nil {
+			return 0, err
+		}
+		header_size = 1
+		data_size = main_obj_len + ivars.size
 	case TYPE_ARRAY:
 		if obj.size == 0 {
-			obj.GetAsArray()
+			_, err := obj.GetAsArray()
+			if err != nil {
+				return 0, err
+			} else {
+				return obj.size, nil
+			}
 		}
-
-		return obj.size
 	case TYPE_MAP:
 		if obj.size == 0 {
-			obj.GetAsMap()
+			_, err := obj.GetAsMap()
+			if err != nil {
+				return 0, err
+			} else {
+				return obj.size, nil
+			}
 		}
-
-		return obj.size
+	case TYPE_UNKNOWN:
+		return 0, UnsupportedType{obj.data[0]}
 	}
 
-	return header_size + data_size
+	return header_size + data_size, nil
 }
 
 func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
@@ -310,7 +414,7 @@ func (obj *MarshalledObject) cacheSymbols(symbols ...string) {
 	for _, symbol := range symbols {
 		_, exists := known[symbol]
 
-		if ! exists {
+		if !exists {
 			cache = append(cache, symbol)
 		}
 	}
@@ -414,27 +518,27 @@ func parseString(data []byte) (string, int) {
 	length, header_size := parseInt(data)
 	size := int(length) + header_size
 
-  return string(data[header_size : size]), size
+	return string(data[header_size:size]), size
 }
 
 func parseStringWithEncoding(data []byte) (string, int, []string) {
 	cache := make([]string, 0)
-  value, size := parseString(data)
+	value, size := parseString(data)
 
-  if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
-    if data[size+1] == ';' {
-      _, enc_size := parseInt(data[size+2:])
-      size += enc_size + 1
-    } else {
-      enc_symbol, enc_size := parseString(data[size+2:])
-      size += enc_size + 1
-      cache = append(cache, enc_symbol)
-    }
+	if len(data) > size+1 && (data[size+1] == ':' || data[size+1] == ';') {
+		if data[size+1] == ';' {
+			_, enc_size := parseInt(data[size+2:])
+			size += enc_size + 1
+		} else {
+			enc_symbol, enc_size := parseString(data[size+2:])
+			size += enc_size + 1
+			cache = append(cache, enc_symbol)
+		}
 
-    if data[size+1] == '"' {
-      encoding, enc_name_size := parseString(data[size+2:])
-      _ = encoding
-      size += enc_name_size + 1
+		if data[size+1] == '"' {
+			encoding, enc_name_size := parseString(data[size+2:])
+			_ = encoding
+			size += enc_name_size + 1
 		} else {
 			_, enc_name_size := parseBool(data[size+1:])
 			size += enc_name_size
@@ -442,7 +546,6 @@ func parseStringWithEncoding(data []byte) (string, int, []string) {
 
 		size += 1
 	}
-
 
 	return value, size, cache
 }

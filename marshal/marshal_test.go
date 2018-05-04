@@ -1,8 +1,8 @@
 package marshal
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func TestCreateMarshalledObject(t *testing.T) {
@@ -53,6 +53,8 @@ func TestGetType(t *testing.T) {
 		// Maps (Ruby hashes)
 		{[]byte{4, 8, 123, 0}, TYPE_MAP},                                                                 // {}
 		{[]byte{4, 8, 123, 6, 58, 8, 102, 111, 111, 73, 34, 8, 98, 97, 114, 6, 58, 6, 69, 84}, TYPE_MAP}, // {foo: "bar"}
+		// Unknown
+		{[]byte{4, 8, 255}, TYPE_UNKNOWN},
 	}
 
 	for _, testCase := range tests {
@@ -176,6 +178,7 @@ type getAsStringTestCase struct {
 
 func TestGetAsString(t *testing.T) {
 	tests := []getAsStringTestCase{
+		{[]byte{4, 8, 34, 7, 104, 105}, "hi"},                                                                                 // a binary-encoded string
 		{[]byte{4, 8, 73, 34, 0, 6, 58, 6, 69, 84}, ""},                                                                       // ''
 		{[]byte{4, 8, 58, 10, 104, 101, 108, 108, 111}, "hello"},                                                              // :hello
 		{[]byte{4, 8, 73, 34, 17, 72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 6, 58, 6, 69, 84}, "Hello, world"}, // 'Hello, world'
@@ -228,13 +231,13 @@ func TestGetAsArray(t *testing.T) {
 		}
 
 		if len(value) != len(testCase.Expectation) {
-			t.Error("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
+			t.Errorf("GetAsArray() returned an array with length %d for %v", len(value), testCase.Expectation)
 		} else {
 			for i, v := range value {
 				value, err := v.GetAsInteger()
 
 				if err != nil {
-					t.Error("GetAsArray() returned an error '%v' for element #%d (%d) of %v", err.Error(), i, testCase.Expectation[i], testCase.Expectation)
+					t.Errorf("GetAsArray() returned an error '%v' for element #%d (%d) of %v", err.Error(), i, testCase.Expectation[i], testCase.Expectation)
 				}
 
 				if value != testCase.Expectation[i] {
@@ -245,9 +248,9 @@ func TestGetAsArray(t *testing.T) {
 	}
 
 	string_tests := []getAsArrayOfStringsTestCase{
-		{[]byte{4, 8, 91, 6, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84}, []string{"foo"}}, // ["foo"]
-		{[]byte{4, 8, 91, 6, 58, 8, 98, 97, 114}, []string{"bar"}}, // [:bar]
-		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 59, 0, 84, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar", :baz]
+		{[]byte{4, 8, 91, 6, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84}, []string{"foo"}},                                                                                                                                                             // ["foo"]
+		{[]byte{4, 8, 91, 6, 58, 8, 98, 97, 114}, []string{"bar"}},                                                                                                                                                                                     // [:bar]
+		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 59, 0, 84, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}},                                                                                     // ["foo", "bar", :baz]
 		{[]byte{4, 8, 91, 8, 73, 34, 8, 102, 111, 111, 6, 58, 6, 69, 84, 73, 34, 8, 98, 97, 114, 6, 58, 13, 101, 110, 99, 111, 100, 105, 110, 103, 34, 14, 83, 104, 105, 102, 116, 95, 74, 73, 83, 58, 8, 98, 97, 122}, []string{"foo", "bar", "baz"}}, // ["foo", "bar".force_encoding("SHIFT_JIS"), :baz]
 		{[]byte{4, 8, 91, 7, 73, 34, 6, 120, 6, 58, 6, 69, 84, 64, 6}, []string{"x", "x"}},
 	}
@@ -329,7 +332,7 @@ func TestGetAsMap(t *testing.T) {
 			}
 		}
 
-		if ! reflect.DeepEqual(m, testCase.Expectation) {
+		if !reflect.DeepEqual(m, testCase.Expectation) {
 			t.Errorf("%v is not equal %v", m, testCase.Expectation)
 		}
 	}
@@ -350,9 +353,9 @@ func TestGetAsMap(t *testing.T) {
 		{
 			[]byte{4, 8, 123, 8, 58, 6, 97, 73, 34, 6, 120, 6, 58, 6, 69, 84, 58, 6, 98, 64, 6, 58, 6, 99, 64, 6},
 			map[string]string{
-				"a":  "x",
-				"b":  "x",
-				"c":  "x",
+				"a": "x",
+				"b": "x",
+				"c": "x",
 			},
 		},
 	}
@@ -369,7 +372,7 @@ func TestGetAsMap(t *testing.T) {
 			}
 		}
 
-		if ! reflect.DeepEqual(m, testCase.Expectation) {
+		if !reflect.DeepEqual(m, testCase.Expectation) {
 			t.Errorf("%v is not equal %v", m, testCase.Expectation)
 		}
 	}
@@ -378,9 +381,9 @@ func TestGetAsMap(t *testing.T) {
 		{
 			[]byte{4, 8, 123, 8, 58, 6, 97, 123, 6, 73, 34, 6, 120, 6, 58, 6, 69, 84, 105, 6, 58, 6, 98, 64, 6, 58, 6, 99, 64, 6},
 			map[string]map[string]int64{
-				"a":  map[string]int64{"x": 1},
-				"b":  map[string]int64{"x": 1},
-				"c":  map[string]int64{"x": 1},
+				"a": map[string]int64{"x": 1},
+				"b": map[string]int64{"x": 1},
+				"c": map[string]int64{"x": 1},
 			},
 		},
 	}
@@ -393,7 +396,7 @@ func TestGetAsMap(t *testing.T) {
 			vv, err := v.GetAsMap()
 
 			if err != nil {
-				t.Errorf("GetAsMap() returned an error while parsing %s", v)
+				t.Errorf("GetAsMap() returned an error while parsing %v", v)
 			}
 
 			m2 := make(map[string]int64)
@@ -401,7 +404,7 @@ func TestGetAsMap(t *testing.T) {
 				m2[k2], err = v2.GetAsInteger()
 
 				if err != nil {
-					t.Errorf("GetAsInteger() returned an error while parsing %s", v2)
+					t.Errorf("GetAsInteger() returned an error while parsing %v", v2)
 				}
 			}
 
@@ -412,8 +415,216 @@ func TestGetAsMap(t *testing.T) {
 			}
 		}
 
-		if ! reflect.DeepEqual(m, testCase.Expectation) {
+		if !reflect.DeepEqual(m, testCase.Expectation) {
 			t.Errorf("%v is not equal %v", m, testCase.Expectation)
+		}
+	}
+}
+
+type fail_case struct {
+	message string
+	data    []byte
+}
+
+// A type we don't understand inside a map or array means we don't know where the map or array ends.
+// Unfortunately that means we can't interpret the rest of the data. (We could maybe do some sniffing
+// to try to find the next type preamble, but that might find false positives inside the data we don't
+// understand.)
+func TestUnsupportedTypes(t *testing.T) {
+
+	failing_arrays := []fail_case{
+		{"one bad element [ XX ]",
+			[]byte{4, 8, 91, 6, 255},
+		},
+		{"a contained bad array [ nil, [ XX ] ]",
+			[]byte{4, 8, 91, 7, 48, 91, 6, 255},
+		},
+		{"a contained bad map [ { nil => XX } ]",
+			[]byte{4, 8, 91, 6, 123, 6, 48, 255},
+		},
+	}
+
+	failing_maps := []fail_case{
+		{"an unsupported key type { XX => nil }",
+			[]byte{4, 8, 123, 6, 255, 48},
+		},
+		{"an unsupported value type { nil => XX }",
+			[]byte{4, 8, 123, 6, 48, 255},
+		},
+		{"a contained bad array { nil => [ XX ] }",
+			[]byte{4, 8, 123, 6, 48, 91, 6, 255},
+		},
+		{"a contained bad map { nil => { nil => XX } }",
+			[]byte{4, 8, 123, 6, 48, 123, 6, 48, 255},
+		},
+	}
+
+	for _, test_case := range failing_arrays {
+		value, err := CreateMarshalledObject(test_case.data).GetAsArray()
+		if _, ok := err.(UnsupportedType); !ok {
+			t.Errorf("Unmarshalling an array with %s should fail with UnsupportedType", test_case.message)
+		} else if value != nil {
+			t.Errorf("Unsupported array with %s should return no value along with the error", test_case.message)
+		}
+	}
+
+	for _, test_case := range failing_maps {
+		value, err := CreateMarshalledObject(test_case.data).GetAsMap()
+		if _, ok := err.(UnsupportedType); !ok {
+			t.Errorf("Unmarshalling a map with %s should fail with UnsupportedType", test_case.message)
+		} else if value != nil {
+			t.Errorf("Unsupported map with %s should return no value along with the error", test_case.message)
+		}
+	}
+}
+
+// We don't know how to actually un-marshal the object, but we can still determine its length
+// (which lets us deserialize the rest of the data)
+func TestUserDefinedSerialization(t *testing.T) {
+	// v4.8, u, :Time, 8-byte sequence
+	user_data := []byte{4, 8, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46}
+	obj := CreateMarshalledObject(user_data)
+	if obj.GetType() != TYPE_USER_DEFINED {
+		t.Fatal("should recognize a user-defined serialization")
+	}
+
+	// v4.8 [ user-defined, true ]
+	// We should be able to extract an object after the user-defined serialization
+	array_data := []byte{4, 8, 91, 7, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 84}
+	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
+	if err != nil {
+		t.Error("Error parsing array containing a user-defined serialization:", err)
+	} else if len(array_value) != 2 {
+		t.Errorf("Incorrect length for array containing a user-defined serialization, %d instead of %d", len(array_value), 2)
+	} else {
+		bool_val, err := array_value[1].GetAsBool()
+		if err != nil {
+			t.Error("Error parsing array value after a user-defined serialization:", err)
+		} else if bool_val != true {
+			t.Error("Boolean value in array after user-defined serialization was corrupted")
+		}
+	}
+
+	maps := [][]byte{
+		// v4.8 { nil => user-defined, true => true }
+		[]byte{4, 8, 123, 7, 48, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 84, 84},
+		// v4.8 { user-defined => nil, true => true }
+		[]byte{4, 8, 123, 7, 117, 58, 9, 84, 105, 109, 101, 13, 79, 144, 29, 128, 224, 36, 120, 46, 48, 84, 84},
+	}
+	for _, map_data := range maps {
+		map_value, err := CreateMarshalledObject(map_data).GetAsMap()
+		if err != nil {
+			t.Error("Error parsing map containing a user-defined serialization:", err)
+		} else if len(map_value) != 2 {
+			t.Errorf("Incorrect length for map containing a user-defined serialization, %d instead of %d", len(map_value), 2)
+		} else {
+			bool_val, err := map_value["true"].GetAsBool()
+			if err != nil {
+				t.Error("Error parsing map entry after a user-defined serialization:", err)
+			} else if bool_val != true {
+				t.Error("Boolean value in map after user-defined serialization was corrupted")
+			}
+		}
+	}
+}
+
+func TestInstanceVars(t *testing.T) {
+	// nil with one instance variable, :key => nil
+	// (nil wouldn't ever really have instance vars, but this is a reduced test case)
+	// v4.8, I, nil, 1, :k, nil
+	instance_data := []byte{4, 8, 73, 48, 6, 58, 6, 107, 48}
+
+	obj := CreateMarshalledObject(instance_data)
+	if obj.GetType() != TYPE_INSTANCE_VARIABLES {
+		t.Fatal("should recognize instance variable definition")
+	}
+
+	// v4.8, I, nil, 1, :k, nil
+	// We should be able to extract an object after instance variable definitions
+	array_data := []byte{4, 8, 91, 7, 73, 48, 6, 58, 6, 107, 48, 84}
+	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
+	if err != nil {
+		t.Error("Error parsing array containing an instance variable definition:", err)
+	} else if len(array_value) != 2 {
+		t.Errorf("Incorrect length for array containing an instance variable definition, %d instead of %d", len(array_value), 2)
+	} else {
+		bool_val, err := array_value[1].GetAsBool()
+		if err != nil {
+			t.Error("Error parsing array value after instance variable definition:", err)
+		} else if bool_val != true {
+			t.Error("Boolean value in array after instance variable definition was corrupted")
+		}
+	}
+
+	maps := [][]byte{
+		// v4.8 { nil => ivar-definition, true => true }
+		[]byte{4, 8, 123, 7, 48, 73, 48, 6, 58, 6, 107, 48, 84, 84},
+		// v4.8 { ivar-definition => nil, true => true }
+		[]byte{4, 8, 123, 7, 73, 48, 6, 58, 6, 107, 48, 48, 84, 84},
+	}
+	for _, map_data := range maps {
+		map_value, err := CreateMarshalledObject(map_data).GetAsMap()
+		if err != nil {
+			t.Error("Error parsing map containing an instance variable definition:", err)
+		} else if len(map_value) != 2 {
+			t.Errorf("Incorrect length for map containing an instance variable definition, %d instead of %d", len(map_value), 2)
+		} else {
+			bool_val, err := map_value["true"].GetAsBool()
+			if err != nil {
+				t.Error("Error parsing map entry after an instance variable definition:", err)
+			} else if bool_val != true {
+				t.Error("Boolean value in map after instance variable definition was corrupted")
+			}
+		}
+	}
+}
+
+func TestObjectInstances(t *testing.T) {
+	// An object of a class "C", with one instance var @k = nil
+	// v4.8, o, :C, :@k, true
+	object_data := []byte{4, 8, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48}
+
+	obj := CreateMarshalledObject(object_data)
+	if obj.GetType() != TYPE_OBJECT_INSTANCE {
+		t.Fatal("should recognize object instance")
+	}
+
+	// We should be able to extract an object after an Object instance
+	// v4.8, [, 2, {o, :C, :@k, true}, true]
+	array_data := []byte{4, 8, 91, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 84}
+	array_value, err := CreateMarshalledObject(array_data).GetAsArray()
+	if err != nil {
+		t.Error("Error parsing array containing an Object instance:", err)
+	} else if len(array_value) != 2 {
+		t.Errorf("Incorrect length for array containing an Object instance, %d instead of %d", len(array_value), 2)
+	} else {
+		bool_val, err := array_value[1].GetAsBool()
+		if err != nil {
+			t.Error("Error parsing array value after Object instance:", err)
+		} else if bool_val != true {
+			t.Error("Boolean value in array after Object instance was corrupted")
+		}
+	}
+
+	maps := [][]byte{
+		// v4.8 { nil => obj, true => true }
+		[]byte{4, 8, 123, 7, 48, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 84, 84},
+		// v4.8 { obj => nil, true => true }
+		[]byte{4, 8, 123, 7, 111, 58, 6, 67, 6, 58, 7, 64, 107, 48, 48, 84, 84},
+	}
+	for _, map_data := range maps {
+		map_value, err := CreateMarshalledObject(map_data).GetAsMap()
+		if err != nil {
+			t.Error("Error parsing map containing an Object instance:", err)
+		} else if len(map_value) != 2 {
+			t.Errorf("Incorrect length for map containing an Object instance, %d instead of %d", len(map_value), 2)
+		} else {
+			bool_val, err := map_value["true"].GetAsBool()
+			if err != nil {
+				t.Error("Error parsing map entry after an Object instance:", err)
+			} else if bool_val != true {
+				t.Error("Boolean value in map after Object instance was corrupted")
+			}
 		}
 	}
 }
