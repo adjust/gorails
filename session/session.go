@@ -16,13 +16,13 @@ import (
 
 var ErrInvalidSignature = errors.New("session: signature not verified")
 
-func generateSecret(base, salt string) []byte {
+func generateSecret(base, salt string, keySize int) []byte {
 	return pbkdf2.Key([]byte(base), []byte(salt), keyIterNum, keySize, sha1.New)
 }
 
 // The origin of this snippet can be found at https://gist.github.com/doitian/2a89dc9e4372e55335c9111f576b47bf
 func verifySign(encryptedData, sign, base, signSalt string) (bool, error) {
-	signKey := generateSecret(base, signSalt)
+	signKey := generateSecret(base, signSalt, keySize)
 	signHmac := hmac.New(sha1.New, signKey)
 	signHmac.Write([]byte(encryptedData))
 	verifySign := signHmac.Sum(nil)
@@ -67,6 +67,27 @@ func decryptCookie(cookie []byte, secret []byte) (dd []byte, err error) {
 	return
 }
 
+func decryptCookieWithAuthentication(data, iv, authTag, secret []byte) (dd []byte, err error) {
+	c, err := aes.NewCipher(secret[:32])
+	if err != nil {
+		return
+	}
+
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		return
+	}
+	if gcm.Overhead() != len(authTag) {
+		return nil, ErrInvalidSignature
+	}
+	dd, err = gcm.Open(nil, iv, append(data, authTag...), nil)
+	if err != nil {
+		return nil, ErrInvalidSignature
+	}
+
+	return
+}
+
 func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (session []byte, err error) {
 	cookie, err := url.QueryUnescape(signedCookie)
 	if err != nil {
@@ -90,7 +111,41 @@ func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (se
 		return
 	}
 
-	session, err = decryptCookie(data, generateSecret(secretKeyBase, salt))
+	session, err = decryptCookie(data, generateSecret(secretKeyBase, salt, keySize))
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func DecryptAuthorizedEncryptedCookie(signedCookie, secretKeyBase, salt string) (session []byte, err error) {
+	cookie, err := url.QueryUnescape(signedCookie)
+	if err != nil {
+		return
+	}
+
+	vectors := strings.SplitN(cookie, "--", 3)
+	if vectors[0] == "" || vectors[1] == "" || vectors[2] == "" {
+		return nil, errors.New("session: invalid cookie")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(vectors[0])
+	if err != nil {
+		return
+	}
+
+	iv, err := base64.StdEncoding.DecodeString(vectors[1])
+	if err != nil {
+		return
+	}
+
+	authTag, err := base64.StdEncoding.DecodeString(vectors[2])
+	if err != nil {
+		return
+	}
+
+	session, err = decryptCookieWithAuthentication(data, iv, authTag, generateSecret(secretKeyBase, salt, keySizeGCM))
 	if err != nil {
 		return
 	}
@@ -102,4 +157,5 @@ func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (se
 const (
 	keyIterNum = 1000
 	keySize    = 64
+	keySizeGCM = 32
 )
