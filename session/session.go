@@ -95,7 +95,7 @@ func DecryptSignedCookie(signedCookie, secretKeyBase, salt, signSalt string) (se
 	}
 
 	vectors := strings.SplitN(cookie, "--", 2)
-	if vectors[0] == "" || vectors[1] == "" {
+	if len(vectors) != 2 || vectors[0] == "" || vectors[1] == "" {
 		return nil, errors.New("session: invalid cookie")
 	}
 	verified, err := verifySign(vectors[0], vectors[1], secretKeyBase, signSalt)
@@ -126,7 +126,7 @@ func DecryptAuthorizedEncryptedCookie(signedCookie, secretKeyBase, salt string) 
 	}
 
 	vectors := strings.SplitN(cookie, "--", 3)
-	if vectors[0] == "" || vectors[1] == "" || vectors[2] == "" {
+	if len(vectors) != 3 || vectors[0] == "" || vectors[1] == "" || vectors[2] == "" {
 		return nil, errors.New("session: invalid cookie")
 	}
 
